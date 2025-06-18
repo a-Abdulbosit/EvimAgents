@@ -1,0 +1,24 @@
+[
+  {
+    "TelegramUserId": 1333252980,
+    "AgentName": "Abdulbosit",
+    "MarketNumber": "935930272",
+    "MarketName": "evim",
+    "Notes": "zeekr catalog kerak",
+    "Latitude": 41.30183,
+    "Longitude": 69.194489,
+    "CreatedAt": "2025-06-17T13:53:46.2337452Z",
+    "Status": 2
+  },
+  {
+    "TelegramUserId": 1333252980,
+    "AgentName": "Abdulbosit",
+    "MarketNumber": "954540272",
+    "MarketName": "ardo",
+    "Notes": "catalog kera",
+    "Latitude": 41.30183,
+    "Longitude": 69.194489,
+    "CreatedAt": "2025-06-17T13:55:54.6702195Z",
+    "Status": 1
+  }
+]
