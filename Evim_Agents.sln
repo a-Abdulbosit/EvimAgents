@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35825.156
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Evim_agent_bot", "Evim_agent_bot\Evim_agent_bot.csproj", "{BA978E00-BDA4-4A52-B2C0-CD5BD0EC383A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{BA978E00-BDA4-4A52-B2C0-CD5BD0EC383A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BA978E00-BDA4-4A52-B2C0-CD5BD0EC383A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BA978E00-BDA4-4A52-B2C0-CD5BD0EC383A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BA978E00-BDA4-4A52-B2C0-CD5BD0EC383A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {8B6F4B04-9AC0-4FD4-8556-B1A38506684B}
+	EndGlobalSection
+EndGlobal
