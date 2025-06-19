@@ -119,7 +119,7 @@ public class TelegramBotHandler
 
         if (!_pendingLocations.TryGetValue(userId, out var session))
             return;
-
+        await bot.SendTextMessageAsync(chatId, query.Data);
         if (query.Data != null && query.Data.StartsWith("status_"))
         {
             var statusNum = int.Parse(query.Data.Replace("status_", ""));
