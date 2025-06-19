@@ -13,6 +13,7 @@ public class DbStorageService
 
     public DbStorageService()
     {
+
         _connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING")
             ?? throw new Exception("DB_CONNECTION_STRING is not set.");
     }
@@ -51,7 +52,7 @@ public class DbStorageService
     {
         using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync();
-
+        
         var sql = @"
             INSERT INTO market_locations (
                 telegram_user_id, agent_name, market_number, market_name,

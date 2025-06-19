@@ -125,17 +125,28 @@ public class TelegramBotHandler
             session.Location.Status = (PartnerStatus)statusNum;
 
             _pendingLocations.Remove(userId);
-            await bot.SendTextMessageAsync(chatId, query.Data);
-            await _dbStorage.SaveLocationAsync(session.Location);
+
+            Console.WriteLine("Saving location: " + System.Text.Json.JsonSerializer.Serialize(session.Location));
+
+            try
+            {
+                await _dbStorage.SaveLocationAsync(session.Location);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("❌ DB Save Error: " + ex.Message);
+                Console.WriteLine(ex.StackTrace);
+                await bot.SendTextMessageAsync(chatId, "❌ Xatolik: saqlashda muammo yuz berdi.");
+                return;
+            }
 
             await bot.SendTextMessageAsync(chatId,
                 $"✅ Сохранено:\n🏪 {session.Location.MarketName} #{session.Location.MarketNumber}\n📍 ({session.Location.Latitude}, {session.Location.Longitude})\n🟢 Статус: {(PartnerStatus)statusNum}");
 
             await bot.SendTextMessageAsync(chatId, "https://evimagents.onrender.com");
-
-            if (query.Id != null)
-                await bot.AnswerCallbackQueryAsync(query.Id);
+            await bot.AnswerCallbackQueryAsync(query.Id);
         }
+
     }
 
 
