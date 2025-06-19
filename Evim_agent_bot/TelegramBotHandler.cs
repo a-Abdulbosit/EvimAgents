@@ -8,23 +8,21 @@ using Evim_agent_bot.YandexMapLibrary.Services;
 
 public class TelegramBotHandler
 {
-    private readonly LocationStorageService _storage = new();
     private readonly TelegramBotClient _botClient;
-    private List<MarketLocation> _savedLocations = new();
+    private readonly DbStorageService _dbStorage;
 
     // Step: 1 = Name, 2 = Number, 3 = Notes, 4 = Status
     private readonly Dictionary<long, (MarketLocation Location, int Step)> _pendingLocations = new();
 
-    public TelegramBotHandler(string token)
+    public TelegramBotHandler(string token, string connectionString)
     {
         _botClient = new TelegramBotClient(token);
+        _dbStorage = new DbStorageService(connectionString);
     }
 
     public async void Start()
     {
         var cts = new CancellationTokenSource();
-
-        _savedLocations = await _storage.LoadFromJsonAsync();
 
         _botClient.StartReceiving(
             HandleUpdateAsync,
@@ -127,9 +125,8 @@ public class TelegramBotHandler
             var statusNum = int.Parse(query.Data.Replace("status_", ""));
             session.Location.Status = (PartnerStatus)statusNum;
 
-            _savedLocations.Add(session.Location);
             _pendingLocations.Remove(userId);
-            await _storage.SaveToJsonAsync(_savedLocations);
+            await _dbStorage.SaveLocationAsync(session.Location);
 
             await bot.SendTextMessageAsync(chatId,
                 $"✅ Сохранено:\n🏪 {session.Location.MarketName} #{session.Location.MarketNumber}\n📍 ({session.Location.Latitude}, {session.Location.Longitude})\n🟢 Статус: {(PartnerStatus)statusNum}");

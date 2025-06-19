@@ -1837,17 +1837,17 @@
         function convertLocationDataToShops(locations) {
             return locations.map((location, index) => ({
                 id: `shop-${index + 1}`,
-                name: location.MarketName,
-                address: `Coordinates: ${location.Latitude.toFixed(6)}, ${location.Longitude.toFixed(6)}`,
-                description: location.Notes || `${location.MarketName} - Partner retail location in our network`,
-                agent: location.AgentName,
-                phone: location.MarketNumber,
-                createdAt: location.CreatedAt,
-                status: location.Status === 1 ? "active" : location.Status === 0 ? "pending" : "inactive",
-                notes: location.Notes,
-                latitude: location.Latitude,
-                longitude: location.Longitude,
-                originalStatus: location.Status
+                name: location.marketName,
+                address: `Coordinates: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`,
+                description: location.notes || `${location.marketName} - Partner retail location in our network`,
+                agent: location.agentName,
+                phone: location.marketNumber,
+                createdAt: location.createdAt,
+                status: location.status === 1 ? "active" : location.status === 0 ? "pending" : "inactive",
+                notes: location.notes,
+                latitude: location.latitude,
+                longitude: location.longitude,
+                originalStatus: location.status
             }));
         }
 
