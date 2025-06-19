@@ -134,7 +134,7 @@ public class TelegramBotHandler
             await bot.SendTextMessageAsync(chatId,
                 $"✅ Сохранено:\n🏪 {session.Location.MarketName} #{session.Location.MarketNumber}\n📍 ({session.Location.Latitude}, {session.Location.Longitude})\n🟢 Статус: {(PartnerStatus)statusNum}");
 
-            await bot.SendTextMessageAsync(chatId, " https://8c40-84-54-94-37.ngrok-free.app");
+            await bot.SendTextMessageAsync(chatId, "https://evimagents.onrender.com");
             await bot.AnswerCallbackQueryAsync(query.Id);
         }
     }
