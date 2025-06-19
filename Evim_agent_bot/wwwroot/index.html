@@ -1838,8 +1838,10 @@
             return locations.map((location, index) => ({
                 id: `shop-${index + 1}`,
                 name: location.marketName,
-                address: `Coordinates: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`,
-                description: location.notes || `${location.marketName} - Partner retail location in our network`,
+                address: location.latitude != null && location.longitude != null
+                    ? `Coordinates: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
+                    : "Coordinates missing",
+                description: location.notes || `${location.marketName} - Partner retail location`,
                 agent: location.agentName,
                 phone: location.marketNumber,
                 createdAt: location.createdAt,
@@ -1850,6 +1852,8 @@
                 originalStatus: location.status
             }));
         }
+
+
 
         // Load shop data with automatic updates
         async function loadShopData(showNotification = false) {
