@@ -114,7 +114,7 @@ public class TelegramBotHandler
 
     private async Task HandleCallbackQuery(ITelegramBotClient bot, CallbackQuery query)
     {
-        var chatId = query.Message.Chat.Id;
+        var chatId = query.Message?.Chat.Id ?? query.From.Id;
         var userId = query.From.Id;
 
         if (!_pendingLocations.TryGetValue(userId, out var session))
@@ -132,9 +132,12 @@ public class TelegramBotHandler
                 $"✅ Сохранено:\n🏪 {session.Location.MarketName} #{session.Location.MarketNumber}\n📍 ({session.Location.Latitude}, {session.Location.Longitude})\n🟢 Статус: {(PartnerStatus)statusNum}");
 
             await bot.SendTextMessageAsync(chatId, "https://evimagents.onrender.com");
-            await bot.AnswerCallbackQueryAsync(query.Id);
+
+            if (query.Id != null)
+                await bot.AnswerCallbackQueryAsync(query.Id);
         }
     }
+
 
     private Task HandleErrorAsync(ITelegramBotClient bot, Exception ex, CancellationToken ct)
     {

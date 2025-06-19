@@ -16,6 +16,37 @@ public class DbStorageService
         _connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING")
             ?? throw new Exception("DB_CONNECTION_STRING is not set.");
     }
+    public async Task<List<MarketLocation>> GetAllLocationsAsync()
+    {
+        var list = new List<MarketLocation>();
+
+        using var conn = new NpgsqlConnection(_connectionString);
+        await conn.OpenAsync();
+
+        var sql = "SELECT * FROM market_locations";
+
+        using var cmd = new NpgsqlCommand(sql, conn);
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            list.Add(new MarketLocation
+            {
+                TelegramUserId = reader.GetInt64(reader.GetOrdinal("telegram_user_id")),
+                AgentName = reader.GetString(reader.GetOrdinal("agent_name")),
+                MarketNumber = reader.GetString(reader.GetOrdinal("market_number")),
+                MarketName = reader.GetString(reader.GetOrdinal("market_name")),
+                Notes = reader.IsDBNull(reader.GetOrdinal("notes")) ? null : reader.GetString(reader.GetOrdinal("notes")),
+                Latitude = reader.GetDouble(reader.GetOrdinal("latitude")),
+                Longitude = reader.GetDouble(reader.GetOrdinal("longitude")),
+                CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
+                Status = (PartnerStatus)reader.GetInt32(reader.GetOrdinal("status"))
+            });
+        }
+
+        return list;
+    }
+
     public async Task SaveLocationAsync(MarketLocation loc)
     {
         using var conn = new NpgsqlConnection(_connectionString);
