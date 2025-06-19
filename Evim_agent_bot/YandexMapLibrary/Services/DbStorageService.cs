@@ -14,7 +14,7 @@ public class DbStorageService
     public DbStorageService()
     {
 
-        _connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING")
+        _connectionString = Environment.GetEnvironmentVariable("Host=dpg-d19s7015pdvs73a52p50-a;Port=5432;Database=evim_db;Username=evim_db_user;Password=zs6QbkYpzIV7OJsK5hAfDmCHeINezK3a;SSL Mode=Require;Tru_\r\n")
             ?? throw new Exception("DB_CONNECTION_STRING is not set.");
     }
     public async Task<List<MarketLocation>> GetAllLocationsAsync()

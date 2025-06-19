@@ -33,7 +33,7 @@ app.MapGet("/locations.json", async () =>
 
 // ✅ Start Telegram bot
 var botToken = Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN")
-               ?? "PUT-YOUR-TOKEN-HERE-FOR-LOCAL-TESTING"; // Optional fallback
+               ?? "7112655258:AAGypb28Fosi0tgoe9LqOiZRY41Rm2fdaVk"; // Optional fallback
 
 var botHandler = new TelegramBotHandler(botToken, connectionString);
 botHandler.Start();
