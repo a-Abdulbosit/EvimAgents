@@ -4,6 +4,7 @@ using Microsoft.Extensions.FileProviders;
 using Evim_agent_bot;
 using Evim_agent_bot.YandexMapLibrary.Services;
 using Microsoft.AspNetCore.Http;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 var app = builder.Build();
@@ -25,9 +26,9 @@ app.MapGet("/locations.json", async () =>
     var db = new DbStorageService(connectionString);
     var locations = await db.GetAllLocationsAsync();
 
-    return Results.Json(locations, new System.Text.Json.JsonSerializerOptions
+    return Results.Json(locations, new JsonSerializerOptions
     {
-        PropertyNamingPolicy = null // Preserves PascalCase for frontend
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     });
 });
 
