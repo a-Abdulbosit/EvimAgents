@@ -8,6 +8,9 @@ let map = null
 const placemarks = []
 let isPanelOpen = false
 let lastDataHash = null
+let userLocationMarker = null
+let userLocation = null
+let watchId = null
 
 // Интервал автообновления (1 секунда)
 const AUTO_UPDATE_INTERVAL = 1000
@@ -83,6 +86,42 @@ function showUpdateNotification() {
     }, 2000)
 }
 
+// Показать уведомление о местоположении
+function showLocationNotification(message, type = "info") {
+    const notification = document.createElement("div")
+    notification.style.cssText = `
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: ${type === "error" ? "#ef4444" : type === "success" ? "#10b981" : "#3b82f6"};
+    color: white;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1003;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    max-width: 300px;
+  `
+    notification.textContent = message
+    document.body.appendChild(notification)
+
+    // Показать уведомление
+    setTimeout(() => {
+        notification.style.transform = "translateX(0)"
+    }, 100)
+
+    // Скрыть уведомление через 4 секунды
+    setTimeout(() => {
+        notification.style.transform = "translateX(100%)"
+        setTimeout(() => {
+            document.body.removeChild(notification)
+        }, 300)
+    }, 4000)
+}
+
 // Показать сообщение об ошибке
 function showErrorMessage(message) {
     domCache.sidebarLoading.style.display = "none"
@@ -127,6 +166,179 @@ function closePanel() {
     domCache.panelToggle.classList.remove("panel-open")
     domCache.panelToggle.innerHTML = "📊"
     isPanelOpen = false
+}
+
+// GPS и геолокация
+function createUserLocationIcon() {
+    const svgContent = `
+    <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+          <feMerge> 
+            <feMergeNode in="coloredBlur"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+      <circle cx="12" cy="12" r="8" fill="#3b82f6" stroke="white" stroke-width="3" filter="url(#glow)"/>
+      <circle cx="12" cy="12" r="3" fill="white"/>
+      <circle cx="12" cy="12" r="12" fill="none" stroke="#3b82f6" stroke-width="1" opacity="0.3">
+        <animate attributeName="r" values="12;20;12" dur="2s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.3;0;0.3" dur="2s" repeatCount="indefinite"/>
+      </circle>
+    </svg>
+  `
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgContent)}`
+}
+
+function getUserLocation() {
+    if (!navigator.geolocation) {
+        showLocationNotification("Геолокация не поддерживается вашим браузером", "error")
+        return
+    }
+
+    showLocationNotification("Определение вашего местоположения...", "info")
+
+    const options = {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000, // Кэш на 1 минуту
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const { latitude, longitude, accuracy } = position.coords
+            userLocation = { latitude, longitude, accuracy }
+
+            showLocationNotification(`Местоположение определено (точность: ${Math.round(accuracy)}м)`, "success")
+            updateUserLocationOnMap(latitude, longitude, accuracy)
+        },
+        (error) => {
+            let errorMessage = "Не удалось определить местоположение"
+
+            switch (error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMessage = "Доступ к геолокации запрещен. Разрешите доступ в настройках браузера."
+                    break
+                case error.POSITION_UNAVAILABLE:
+                    errorMessage = "Информация о местоположении недоступна"
+                    break
+                case error.TIMEOUT:
+                    errorMessage = "Время ожидания определения местоположения истекло"
+                    break
+            }
+
+            showLocationNotification(errorMessage, "error")
+            console.error("Ошибка геолокации:", error)
+        },
+        options,
+    )
+}
+
+function startWatchingLocation() {
+    if (!navigator.geolocation) return
+
+    const options = {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 30000,
+    }
+
+    watchId = navigator.geolocation.watchPosition(
+        (position) => {
+            const { latitude, longitude, accuracy } = position.coords
+            userLocation = { latitude, longitude, accuracy }
+            updateUserLocationOnMap(latitude, longitude, accuracy)
+        },
+        (error) => {
+            console.error("Ошибка отслеживания местоположения:", error)
+        },
+        options,
+    )
+}
+
+function stopWatchingLocation() {
+    if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId)
+        watchId = null
+    }
+}
+
+function updateUserLocationOnMap(latitude, longitude, accuracy) {
+    if (!map) return
+
+    // Удалить предыдущий маркер местоположения
+    if (userLocationMarker) {
+        map.geoObjects.remove(userLocationMarker)
+    }
+
+    // Создать новый маркер местоположения
+    userLocationMarker = new ymaps.Placemark(
+        [latitude, longitude],
+        {
+            balloonContent: `
+        <div style="padding: 10px; text-align: center;">
+          <div style="font-weight: 600; margin-bottom: 5px;">📍 Ваше местоположение</div>
+          <div style="font-size: 12px; color: #666;">
+            Координаты: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}<br>
+            Точность: ${Math.round(accuracy)} метров
+          </div>
+          <button onclick="centerOnUserLocation()" style="
+            margin-top: 8px;
+            padding: 4px 8px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+          ">Центрировать карту</button>
+        </div>
+      `,
+            hintContent: "Ваше текущее местоположение",
+        },
+        {
+            iconLayout: "default#image",
+            iconImageHref: createUserLocationIcon(),
+            iconImageSize: [24, 24],
+            iconImageOffset: [-12, -12],
+            balloonOffset: [0, -10],
+        },
+    )
+
+    map.geoObjects.add(userLocationMarker)
+
+    // Добавить круг точности, если точность больше 100 метров
+    if (accuracy > 100) {
+        const accuracyCircle = new ymaps.Circle(
+            [[latitude, longitude], accuracy],
+            {},
+            {
+                fillColor: "#3b82f6",
+                fillOpacity: 0.1,
+                strokeColor: "#3b82f6",
+                strokeOpacity: 0.3,
+                strokeWidth: 2,
+            },
+        )
+        map.geoObjects.add(accuracyCircle)
+    }
+}
+
+function centerOnUserLocation() {
+    if (userLocation && map) {
+        map.setCenter([userLocation.latitude, userLocation.longitude], 16, {
+            duration: 600,
+            timingFunction: "ease-out",
+        })
+
+        if (userLocationMarker) {
+            userLocationMarker.balloon.open()
+        }
+    } else {
+        getUserLocation()
+    }
 }
 
 // Утилитарные функции
@@ -378,7 +590,7 @@ function formatDateRussian(dateString) {
 function updateMap() {
     if (!map) return
 
-    // Очистка существующих меток
+    // Очистка существующих меток (кроме пользовательской)
     placemarks.forEach((placemark) => {
         map.geoObjects.remove(placemark)
     })
@@ -401,6 +613,17 @@ function updateMap() {
             .map((shop) => {
                 const statusInfo = getStatusInfo(shop.originalStatus)
                 const yandexGoUrl = `https://3.redirect.appmetrica.yandex.com/route?end-lat=${shop.latitude}&end-lon=${shop.longitude}&appmetrica_tracking_id=1178268795219780156`
+
+                // Рассчитать расстояние до пользователя, если местоположение известно
+                let distanceText = ""
+                if (userLocation) {
+                    const distance = getDistance(userLocation.latitude, userLocation.longitude, shop.latitude, shop.longitude)
+                    if (distance < 1000) {
+                        distanceText = `<div style="font-size: 11px; color: #059669; margin-top: 4px;">📍 ${Math.round(distance)} м от вас</div>`
+                    } else {
+                        distanceText = `<div style="font-size: 11px; color: #3b82f6; margin-top: 4px;">📍 ${(distance / 1000).toFixed(1)} км от вас</div>`
+                    }
+                }
 
                 return `
           <div class="store-card">
@@ -436,7 +659,7 @@ function updateMap() {
                 </div>
                 <div class="detail-content">
                   <span class="detail-label">Добавлено</span>
-                  <span class="detail-value">${formatDateRussian(shop.createdAt)}</span>
+                  <span class="detail-value">${formatDateRussian(shop.createdAt)}${distanceText}</span>
                 </div>
               </div>
               <div class="detail-row">
@@ -559,6 +782,30 @@ function initMap() {
             },
         )
 
+        // Добавить кнопку геолокации
+        const locationButton = new ymaps.control.Button({
+            data: {
+                content: "📍",
+                title: "Показать мое местоположение",
+            },
+            options: {
+                selectOnClick: false,
+                maxWidth: 40,
+            },
+        })
+
+        locationButton.events.add("click", () => {
+            if (userLocation) {
+                centerOnUserLocation()
+            } else {
+                getUserLocation()
+            }
+        })
+
+        map.controls.add(locationButton, {
+            position: { right: 10, top: 170 },
+        })
+
         map.controls.get("zoomControl").options.set({
             size: "large",
             position: { right: 10, top: 50 },
@@ -579,6 +826,12 @@ function initMap() {
 
         // Запуск автообновления
         startAutoUpdate()
+
+        // Автоматически получить местоположение пользователя при загрузке
+        setTimeout(() => {
+            getUserLocation()
+            startWatchingLocation()
+        }, 1000)
     })
 }
 
@@ -617,7 +870,17 @@ function createShopCard(shop) {
     const description = isExpanded ? shop.description : truncateText(shop.description)
     const needsExpansion = shop.description.length > 120
 
-    return `
+    // Рассчитать расстояние до пользователя, если местоположение известно
+    let distanceText = ''
+    if (userLocation) {
+        const distance = getDistance(userLocation.latitude, userLocation.longitude, shop.latitude, shop.longitude)
+        if (distance < 1000) {
+            distanceText = `<div style="font-size: 0.75rem; color: #059669; margin-top: 0.25rem;">📍 ${Math.round(distance)} м от вас</div>`
+        } else {
+            distanceText = `<div style="font-size: 0.75rem; color: #3b82f6; margin-top: 0.25rem;">📍 ${(distance / 1000).toFixed(1)} км от вас</div>`
+        }
+
+        return `
     <div class="shop-card">
       <div class="shop-header">
         <h3 class="shop-name">${shop.name}</h3>
@@ -629,7 +892,7 @@ function createShopCard(shop) {
           <div class="detail-icon address">📍</div>
           <div class="detail-content">
             <div class="detail-label">Адрес</div>
-            <div class="detail-value">${shop.address}</div>
+            <div class="detail-value">${shop.address}${distanceText}</div>
           </div>
         </div>
         
@@ -658,13 +921,13 @@ function createShopCard(shop) {
             <div class="detail-value description-text">
               ${description}
               ${needsExpansion
-            ? `
+                ? `
                   <button class="expand-btn" onclick="toggleDescription('${shop.id}')">
                     ${isExpanded ? "Показать меньше" : "Показать больше"}
                   </button>
                 `
-            : ""
-        }
+                : ""
+            }
             </div>
           </div>
         </div>
@@ -678,14 +941,14 @@ function createShopCard(shop) {
         </div>
         
         ${shop.notes && shop.notes !== shop.description
-            ? `
+                ? `
             <div class="notes-section">
               <div class="detail-label">Заметки</div>
               <div class="detail-value description-text">${shop.notes}</div>
             </div>
           `
-            : ""
-        }
+                : ""
+            }
       </div>
       
       <button class="view-details-btn" onclick="viewShopDetails('${shop.id}')">
@@ -693,134 +956,135 @@ function createShopCard(shop) {
       </button>
     </div>
   `
-}
-
-// Рендеринг магазинов (оптимизированный)
-function renderShops() {
-    const startIndex = currentPage * itemsPerPage
-    const endIndex = startIndex + itemsPerPage
-    const currentShops = allShops.slice(startIndex, endIndex)
-
-    const html = currentShops.map((shop) => createShopCard(shop)).join("")
-    domCache.shopsGrid.innerHTML = html
-
-    updatePagination()
-}
-
-function updatePagination() {
-    const totalPages = Math.ceil(allShops.length / itemsPerPage)
-    const startIndex = currentPage * itemsPerPage
-    const endIndex = Math.min(startIndex + itemsPerPage, allShops.length)
-
-    domCache.paginationInfo.textContent = `Показано с ${startIndex + 1} по ${endIndex} из ${allShops.length} магазинов`
-
-    domCache.pagination.style.display = totalPages > 1 ? "flex" : "none"
-
-    if (totalPages <= 1) return
-
-    let html = ""
-
-    html += `<button class="pagination-btn" ${currentPage === 0 ? "disabled" : ""} onclick="goToPage(${currentPage - 1})">‹</button>`
-
-    const maxVisiblePages = 5
-    let startPage = Math.max(0, currentPage - Math.floor(maxVisiblePages / 2))
-    const endPage = Math.min(totalPages - 1, startPage + maxVisiblePages - 1)
-
-    if (endPage - startPage < maxVisiblePages - 1) {
-        startPage = Math.max(0, endPage - maxVisiblePages + 1)
     }
 
-    for (let i = startPage; i <= endPage; i++) {
-        html += `<button class="pagination-btn ${i === currentPage ? "active" : ""}" onclick="goToPage(${i})">${i + 1}</button>`
+    // Рендеринг магазинов (оптимизированный)
+    function renderShops() {
+        const startIndex = currentPage * itemsPerPage
+        const endIndex = startIndex + itemsPerPage
+        const currentShops = allShops.slice(startIndex, endIndex)
+
+        const html = currentShops.map((shop) => createShopCard(shop)).join("")
+        domCache.shopsGrid.innerHTML = html
+
+        updatePagination()
     }
 
-    if (endPage < totalPages - 1) {
-        if (endPage < totalPages - 2) {
-            html += '<div class="pagination-ellipsis">...</div>'
+    function updatePagination() {
+        const totalPages = Math.ceil(allShops.length / itemsPerPage)
+        const startIndex = currentPage * itemsPerPage
+        const endIndex = Math.min(startIndex + itemsPerPage, allShops.length)
+
+        domCache.paginationInfo.textContent = `Показано с ${startIndex + 1} по ${endIndex} из ${allShops.length} магазинов`
+
+        domCache.pagination.style.display = totalPages > 1 ? "flex" : "none"
+
+        if (totalPages <= 1) return
+
+        let html = ""
+
+        html += `<button class="pagination-btn" ${currentPage === 0 ? "disabled" : ""} onclick="goToPage(${currentPage - 1})">‹</button>`
+
+        const maxVisiblePages = 5
+        let startPage = Math.max(0, currentPage - Math.floor(maxVisiblePages / 2))
+        const endPage = Math.min(totalPages - 1, startPage + maxVisiblePages - 1)
+
+        if (endPage - startPage < maxVisiblePages - 1) {
+            startPage = Math.max(0, endPage - maxVisiblePages + 1)
         }
-        html += `<button class="pagination-btn" onclick="goToPage(${totalPages - 1})">${totalPages}</button>`
+
+        for (let i = startPage; i <= endPage; i++) {
+            html += `<button class="pagination-btn ${i === currentPage ? "active" : ""}" onclick="goToPage(${i})">${i + 1}</button>`
+        }
+
+        if (endPage < totalPages - 1) {
+            if (endPage < totalPages - 2) {
+                html += '<div class="pagination-ellipsis">...</div>'
+            }
+            html += `<button class="pagination-btn" onclick="goToPage(${totalPages - 1})">${totalPages}</button>`
+        }
+
+        html += `<button class="pagination-btn" ${currentPage === totalPages - 1 ? "disabled" : ""} onclick="goToPage(${currentPage + 1})">›</button>`
+
+        domCache.paginationControls.innerHTML = html
     }
 
-    html += `<button class="pagination-btn" ${currentPage === totalPages - 1 ? "disabled" : ""} onclick="goToPage(${currentPage + 1})">›</button>`
+    function goToPage(page) {
+        const totalPages = Math.ceil(allShops.length / itemsPerPage)
+        if (page >= 0 && page < totalPages) {
+            currentPage = page
+            renderShops()
 
-    domCache.paginationControls.innerHTML = html
-}
+            // Прокрутка к верху содержимого всплывающего окна при смене страниц
+            const popupContent = domCache.popupOverlay.querySelector(".popup-content")
+            if (popupContent) {
+                popupContent.scrollTop = 0
+            }
+        }
+    }
 
-function goToPage(page) {
-    const totalPages = Math.ceil(allShops.length / itemsPerPage)
-    if (page >= 0 && page < totalPages) {
-        currentPage = page
+    function openPopup() {
+        if (allShops.length === 0) return
+
+        currentPage = 0
+        expandedDescriptions.clear()
         renderShops()
 
-        // Прокрутка к верху содержимого всплывающего окна при смене страниц
-        const popupContent = domCache.popupOverlay.querySelector(".popup-content")
-        if (popupContent) {
-            popupContent.scrollTop = 0
-        }
+        domCache.popupOverlay.classList.add("active")
+        document.body.style.overflow = "hidden"
+
+        // Убедиться, что содержимое всплывающего окна начинается сверху
+        setTimeout(() => {
+            const popupContent = domCache.popupOverlay.querySelector(".popup-content")
+            if (popupContent) {
+                popupContent.scrollTop = 0
+            }
+        }, 100)
     }
-}
 
-function openPopup() {
-    if (allShops.length === 0) return
-
-    currentPage = 0
-    expandedDescriptions.clear()
-    renderShops()
-
-    domCache.popupOverlay.classList.add("active")
-    document.body.style.overflow = "hidden"
-
-    // Убедиться, что содержимое всплывающего окна начинается сверху
-    setTimeout(() => {
-        const popupContent = domCache.popupOverlay.querySelector(".popup-content")
-        if (popupContent) {
-            popupContent.scrollTop = 0
-        }
-    }, 100)
-}
-
-function closePopup() {
-    domCache.popupOverlay.classList.remove("active")
-    document.body.style.overflow = "unset"
-}
-
-function closePopupOnOverlay(event) {
-    if (event.target === event.currentTarget) {
-        closePopup()
+    function closePopup() {
+        domCache.popupOverlay.classList.remove("active")
+        document.body.style.overflow = "unset"
     }
-}
 
-function viewShopDetails(shopId) {
-    const shop = allShops.find((s) => s.id === shopId)
-    if (shop && map) {
-        closePopup()
-        closePanel() // Close the left sidebar automatically
-        selectShop(shopId)
-        // Remove the condition that opens panel - we want it closed
-    }
-}
-
-// Обработчики событий клавиатуры
-document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-        if (domCache.popupOverlay.classList.contains("active")) {
+    function closePopupOnOverlay(event) {
+        if (event.target === event.currentTarget) {
             closePopup()
-        } else if (isPanelOpen) {
-            closePanel()
         }
     }
-})
 
-// Инициализация приложения
-document.addEventListener("DOMContentLoaded", () => {
-    initDOMCache()
-    initMap()
-})
+    function viewShopDetails(shopId) {
+        const shop = allShops.find((s) => s.id === shopId)
+        if (shop && map) {
+            closePopup()
+            closePanel() // Close the left sidebar automatically
+            selectShop(shopId)
+            // Remove the condition that opens panel - we want it closed
+        }
+    }
 
-// Очистка при выгрузке страницы
-window.addEventListener("beforeunload", () => {
-    stopAutoUpdate()
-    // Очистка кэшей
-    iconCache.clear()
-    Object.keys(domCache).forEach((key) => delete domCache[key])
-})
+    // Обработчики событий клавиатуры
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+            if (domCache.popupOverlay.classList.contains("active")) {
+                closePopup()
+            } else if (isPanelOpen) {
+                closePanel()
+            }
+        }
+    })
+
+    // Инициализация приложения
+    document.addEventListener("DOMContentLoaded", () => {
+        initDOMCache()
+        initMap()
+    })
+
+    // Очистка при выгрузке страницы
+    window.addEventListener("beforeunload", () => {
+        stopAutoUpdate()
+        stopWatchingLocation()
+        // Очистка кэшей
+        iconCache.clear()
+        Object.keys(domCache).forEach((key) => delete domCache[key])
+    })
