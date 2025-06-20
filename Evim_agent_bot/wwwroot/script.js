@@ -308,22 +308,6 @@ function updateUserLocationOnMap(latitude, longitude, accuracy) {
     )
 
     map.geoObjects.add(userLocationMarker)
-
-    // Добавить круг точности, если точность больше 100 метров
-    if (accuracy > 100) {
-        const accuracyCircle = new ymaps.Circle(
-            [[latitude, longitude], accuracy],
-            {},
-            {
-                fillColor: "#3b82f6",
-                fillOpacity: 0.1,
-                strokeColor: "#3b82f6",
-                strokeOpacity: 0.3,
-                strokeWidth: 2,
-            },
-        )
-        map.geoObjects.add(accuracyCircle)
-    }
 }
 
 function centerOnUserLocation() {
@@ -871,7 +855,7 @@ function createShopCard(shop) {
     const needsExpansion = shop.description.length > 120
 
     // Рассчитать расстояние до пользователя, если местоположение известно
-    let distanceText = ''
+    let distanceText = ""
     if (userLocation) {
         const distance = getDistance(userLocation.latitude, userLocation.longitude, shop.latitude, shop.longitude)
         if (distance < 1000) {
@@ -879,8 +863,9 @@ function createShopCard(shop) {
         } else {
             distanceText = `<div style="font-size: 0.75rem; color: #3b82f6; margin-top: 0.25rem;">📍 ${(distance / 1000).toFixed(1)} км от вас</div>`
         }
+    }
 
-        return `
+    return `
     <div class="shop-card">
       <div class="shop-header">
         <h3 class="shop-name">${shop.name}</h3>
@@ -921,13 +906,13 @@ function createShopCard(shop) {
             <div class="detail-value description-text">
               ${description}
               ${needsExpansion
-                ? `
+            ? `
                   <button class="expand-btn" onclick="toggleDescription('${shop.id}')">
                     ${isExpanded ? "Показать меньше" : "Показать больше"}
                   </button>
                 `
-                : ""
-            }
+            : ""
+        }
             </div>
           </div>
         </div>
@@ -941,14 +926,14 @@ function createShopCard(shop) {
         </div>
         
         ${shop.notes && shop.notes !== shop.description
-                ? `
+            ? `
             <div class="notes-section">
               <div class="detail-label">Заметки</div>
               <div class="detail-value description-text">${shop.notes}</div>
             </div>
           `
-                : ""
-            }
+            : ""
+        }
       </div>
       
       <button class="view-details-btn" onclick="viewShopDetails('${shop.id}')">
@@ -956,135 +941,135 @@ function createShopCard(shop) {
       </button>
     </div>
   `
+}
+
+// Рендеринг магазинов (оптимизированный)
+function renderShops() {
+    const startIndex = currentPage * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    const currentShops = allShops.slice(startIndex, endIndex)
+
+    const html = currentShops.map((shop) => createShopCard(shop)).join("")
+    domCache.shopsGrid.innerHTML = html
+
+    updatePagination()
+}
+
+function updatePagination() {
+    const totalPages = Math.ceil(allShops.length / itemsPerPage)
+    const startIndex = currentPage * itemsPerPage
+    const endIndex = Math.min(startIndex + itemsPerPage, allShops.length)
+
+    domCache.paginationInfo.textContent = `Показано с ${startIndex + 1} по ${endIndex} из ${allShops.length} магазинов`
+
+    domCache.pagination.style.display = totalPages > 1 ? "flex" : "none"
+
+    if (totalPages <= 1) return
+
+    let html = ""
+
+    html += `<button class="pagination-btn" ${currentPage === 0 ? "disabled" : ""} onclick="goToPage(${currentPage - 1})">‹</button>`
+
+    const maxVisiblePages = 5
+    let startPage = Math.max(0, currentPage - Math.floor(maxVisiblePages / 2))
+    const endPage = Math.min(totalPages - 1, startPage + maxVisiblePages - 1)
+
+    if (endPage - startPage < maxVisiblePages - 1) {
+        startPage = Math.max(0, endPage - maxVisiblePages + 1)
     }
 
-    // Рендеринг магазинов (оптимизированный)
-    function renderShops() {
-        const startIndex = currentPage * itemsPerPage
-        const endIndex = startIndex + itemsPerPage
-        const currentShops = allShops.slice(startIndex, endIndex)
-
-        const html = currentShops.map((shop) => createShopCard(shop)).join("")
-        domCache.shopsGrid.innerHTML = html
-
-        updatePagination()
+    for (let i = startPage; i <= endPage; i++) {
+        html += `<button class="pagination-btn ${i === currentPage ? "active" : ""}" onclick="goToPage(${i})">${i + 1}</button>`
     }
 
-    function updatePagination() {
-        const totalPages = Math.ceil(allShops.length / itemsPerPage)
-        const startIndex = currentPage * itemsPerPage
-        const endIndex = Math.min(startIndex + itemsPerPage, allShops.length)
-
-        domCache.paginationInfo.textContent = `Показано с ${startIndex + 1} по ${endIndex} из ${allShops.length} магазинов`
-
-        domCache.pagination.style.display = totalPages > 1 ? "flex" : "none"
-
-        if (totalPages <= 1) return
-
-        let html = ""
-
-        html += `<button class="pagination-btn" ${currentPage === 0 ? "disabled" : ""} onclick="goToPage(${currentPage - 1})">‹</button>`
-
-        const maxVisiblePages = 5
-        let startPage = Math.max(0, currentPage - Math.floor(maxVisiblePages / 2))
-        const endPage = Math.min(totalPages - 1, startPage + maxVisiblePages - 1)
-
-        if (endPage - startPage < maxVisiblePages - 1) {
-            startPage = Math.max(0, endPage - maxVisiblePages + 1)
+    if (endPage < totalPages - 1) {
+        if (endPage < totalPages - 2) {
+            html += '<div class="pagination-ellipsis">...</div>'
         }
-
-        for (let i = startPage; i <= endPage; i++) {
-            html += `<button class="pagination-btn ${i === currentPage ? "active" : ""}" onclick="goToPage(${i})">${i + 1}</button>`
-        }
-
-        if (endPage < totalPages - 1) {
-            if (endPage < totalPages - 2) {
-                html += '<div class="pagination-ellipsis">...</div>'
-            }
-            html += `<button class="pagination-btn" onclick="goToPage(${totalPages - 1})">${totalPages}</button>`
-        }
-
-        html += `<button class="pagination-btn" ${currentPage === totalPages - 1 ? "disabled" : ""} onclick="goToPage(${currentPage + 1})">›</button>`
-
-        domCache.paginationControls.innerHTML = html
+        html += `<button class="pagination-btn" onclick="goToPage(${totalPages - 1})">${totalPages}</button>`
     }
 
-    function goToPage(page) {
-        const totalPages = Math.ceil(allShops.length / itemsPerPage)
-        if (page >= 0 && page < totalPages) {
-            currentPage = page
-            renderShops()
+    html += `<button class="pagination-btn" ${currentPage === totalPages - 1 ? "disabled" : ""} onclick="goToPage(${currentPage + 1})">›</button>`
 
-            // Прокрутка к верху содержимого всплывающего окна при смене страниц
-            const popupContent = domCache.popupOverlay.querySelector(".popup-content")
-            if (popupContent) {
-                popupContent.scrollTop = 0
-            }
-        }
-    }
+    domCache.paginationControls.innerHTML = html
+}
 
-    function openPopup() {
-        if (allShops.length === 0) return
-
-        currentPage = 0
-        expandedDescriptions.clear()
+function goToPage(page) {
+    const totalPages = Math.ceil(allShops.length / itemsPerPage)
+    if (page >= 0 && page < totalPages) {
+        currentPage = page
         renderShops()
 
-        domCache.popupOverlay.classList.add("active")
-        document.body.style.overflow = "hidden"
-
-        // Убедиться, что содержимое всплывающего окна начинается сверху
-        setTimeout(() => {
-            const popupContent = domCache.popupOverlay.querySelector(".popup-content")
-            if (popupContent) {
-                popupContent.scrollTop = 0
-            }
-        }, 100)
+        // Прокрутка к верху содержимого всплывающего окна при смене страниц
+        const popupContent = domCache.popupOverlay.querySelector(".popup-content")
+        if (popupContent) {
+            popupContent.scrollTop = 0
+        }
     }
+}
 
-    function closePopup() {
-        domCache.popupOverlay.classList.remove("active")
-        document.body.style.overflow = "unset"
+function openPopup() {
+    if (allShops.length === 0) return
+
+    currentPage = 0
+    expandedDescriptions.clear()
+    renderShops()
+
+    domCache.popupOverlay.classList.add("active")
+    document.body.style.overflow = "hidden"
+
+    // Убедиться, что содержимое всплывающего окна начинается сверху
+    setTimeout(() => {
+        const popupContent = domCache.popupOverlay.querySelector(".popup-content")
+        if (popupContent) {
+            popupContent.scrollTop = 0
+        }
+    }, 100)
+}
+
+function closePopup() {
+    domCache.popupOverlay.classList.remove("active")
+    document.body.style.overflow = "unset"
+}
+
+function closePopupOnOverlay(event) {
+    if (event.target === event.currentTarget) {
+        closePopup()
     }
+}
 
-    function closePopupOnOverlay(event) {
-        if (event.target === event.currentTarget) {
+function viewShopDetails(shopId) {
+    const shop = allShops.find((s) => s.id === shopId)
+    if (shop && map) {
+        closePopup()
+        closePanel() // Close the left sidebar automatically
+        selectShop(shopId)
+        // Remove the condition that opens panel - we want it closed
+    }
+}
+
+// Обработчики событий клавиатуры
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+        if (domCache.popupOverlay.classList.contains("active")) {
             closePopup()
+        } else if (isPanelOpen) {
+            closePanel()
         }
     }
+})
 
-    function viewShopDetails(shopId) {
-        const shop = allShops.find((s) => s.id === shopId)
-        if (shop && map) {
-            closePopup()
-            closePanel() // Close the left sidebar automatically
-            selectShop(shopId)
-            // Remove the condition that opens panel - we want it closed
-        }
-    }
+// Инициализация приложения
+document.addEventListener("DOMContentLoaded", () => {
+    initDOMCache()
+    initMap()
+})
 
-    // Обработчики событий клавиатуры
-    document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") {
-            if (domCache.popupOverlay.classList.contains("active")) {
-                closePopup()
-            } else if (isPanelOpen) {
-                closePanel()
-            }
-        }
-    })
-
-    // Инициализация приложения
-    document.addEventListener("DOMContentLoaded", () => {
-        initDOMCache()
-        initMap()
-    })
-
-    // Очистка при выгрузке страницы
-    window.addEventListener("beforeunload", () => {
-        stopAutoUpdate()
-        stopWatchingLocation()
-        // Очистка кэшей
-        iconCache.clear()
-        Object.keys(domCache).forEach((key) => delete domCache[key])
-    })
+// Очистка при выгрузке страницы
+window.addEventListener("beforeunload", () => {
+    stopAutoUpdate()
+    stopWatchingLocation()
+    // Очистка кэшей
+    iconCache.clear()
+    Object.keys(domCache).forEach((key) => delete domCache[key])
+})
