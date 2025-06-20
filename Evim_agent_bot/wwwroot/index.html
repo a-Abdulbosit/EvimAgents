@@ -1,61 +1,60 @@
 ﻿<!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Каталог партнерских магазинов с картой</title>
-    <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU" type="text/javascript"></script>
+    <title>Partner Shops Directory with Map</title>
+    <script src="https://api-maps.yandex.ru/2.1/?lang=en_US" type="text/javascript"></script>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="app-container">
-        <!-- Кнопка переключения -->
+        <!-- Toggle Button -->
         <button class="panel-toggle" id="panelToggle" onclick="togglePanel()">
             📊
         </button>
 
-        <!-- Выдвижная боковая панель -->
+        <!-- Collapsible Sidebar Panel -->
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <button class="close-panel-btn" onclick="closePanel()">×</button>
-                <h1 class="sidebar-title">Партнерские магазины</h1>
-                <p class="sidebar-subtitle" id="sidebarSubtitle">Загрузка магазинов...</p>
+                <h1 class="sidebar-title">Partner Shops</h1>
+                <p class="sidebar-subtitle" id="sidebarSubtitle">Loading shops...</p>
                 <div class="auto-update-indicator">
                     <div class="update-dot"></div>
-                    <span>Обновление каждую секунду</span>
+                    <span>Live updates every 1s</span>
                 </div>
             </div>
 
             <div class="sidebar-content">
-                <!-- Состояние загрузки -->
+                <!-- Loading State -->
                 <div class="loading-container" id="sidebarLoading">
                     <div class="spinner"></div>
-                    <p style="font-size: 0.875rem; color: #6b7280;">Загрузка данных магазинов...</p>
+                    <p style="font-size: 0.875rem; color: #6b7280;">Loading shop data...</p>
                 </div>
-
-                <!-- Контент -->
+                <!-- Content -->
                 <div id="sidebarContent" style="display: none;">
                     <div class="status-overview">
-                        <div class="status-title">Обзор статусов магазинов</div>
+                        <div class="status-title">Shop Status Overview</div>
                         <div class="status-items">
                             <div class="status-item">
                                 <div class="status-label">
                                     <div class="status-dot active"></div>
-                                    Активные
+                                    Active
                                 </div>
                                 <div class="status-count" id="activeCount">0</div>
                             </div>
                             <div class="status-item">
                                 <div class="status-label">
                                     <div class="status-dot pending"></div>
-                                    В ожидании
+                                    Pending
                                 </div>
                                 <div class="status-count" id="pendingCount">0</div>
                             </div>
                             <div class="status-item">
                                 <div class="status-label">
                                     <div class="status-dot inactive"></div>
-                                    Неактивные
+                                    Inactive
                                 </div>
                                 <div class="status-count" id="inactiveCount">0</div>
                             </div>
@@ -63,50 +62,50 @@
                     </div>
 
                     <div class="shops-list" id="shopsList">
-                        <!-- Элементы магазинов будут вставлены здесь -->
+                        <!-- Shop items will be inserted here -->
                     </div>
 
                     <button class="view-all-btn" onclick="openPopup()">
-                        Показать все магазины подробно
+                        View All Shops in Detail
                     </button>
                 </div>
             </div>
         </div>
 
-        <!-- Контейнер карты -->
+        <!-- Map Container -->
         <div class="map-container">
             <div id="map"></div>
         </div>
     </div>
 
-    <!-- Уведомление об обновлении -->
+    <!-- Update Notification -->
     <div class="update-notification" id="updateNotification">
-        📊 Данные магазинов обновлены!
+        📊 Shop data updated!
     </div>
 
-    <!-- Всплывающее окно -->
+    <!-- Popup Overlay -->
     <div class="popup-overlay" id="popupOverlay" onclick="closePopupOnOverlay(event)">
         <div class="popup-container" onclick="event.stopPropagation()">
             <div class="popup-header">
                 <div>
-                    <h2 class="popup-title">Все партнерские магазины</h2>
-                    <p class="popup-subtitle" id="popupSubtitle">Найдено 0 магазинов</p>
+                    <h2 class="popup-title">All Partner Shops</h2>
+                    <p class="popup-subtitle" id="popupSubtitle">0 shops found</p>
                 </div>
                 <button class="close-btn" onclick="closePopup()">×</button>
             </div>
 
             <div class="popup-content">
                 <div class="shops-grid" id="shopsGrid">
-                    <!-- Карточки магазинов будут вставлены здесь -->
+                    <!-- Shop cards will be inserted here -->
                 </div>
             </div>
 
             <div class="pagination" id="pagination" style="display: none;">
                 <div class="pagination-info" id="paginationInfo">
-                    Показано с 1 по 6 из 0 магазинов
+                    Showing 1 to 6 of 0 shops
                 </div>
                 <div class="pagination-controls" id="paginationControls">
-                    <!-- Кнопки пагинации будут вставлены здесь -->
+                    <!-- Pagination buttons will be inserted here -->
                 </div>
             </div>
         </div>
