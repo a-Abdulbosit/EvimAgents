@@ -63,7 +63,7 @@ function throttle(func, limit) {
     }
 }
 
-// Генерация хэша для сравнения данных (��птимизированная)
+// Генерация хэша для сравнения данных (оптимизированная)
 function generateDataHash(data) {
     const str = JSON.stringify(data)
     let hash = 0
@@ -177,7 +177,14 @@ function convertLocationDataToShops(locations) {
         agent: location.agentName,
         phone: location.marketNumber,
         createdAt: location.createdAt,
-        status: location.status === 1 ? "active" : location.status === 0 ? "pending" : "inactive",
+        status:
+            location.status === 1
+                ? "active"
+                : location.status === 0
+                    ? "pending"
+                    : location.status === 2
+                        ? "inactive"
+                        : "inactive",
         notes: location.notes,
         latitude: location.latitude,
         longitude: location.longitude,
