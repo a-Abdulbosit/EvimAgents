@@ -147,11 +147,11 @@ function createCustomIcon(iconColor, iconSize, displayText) {
     const svgContent = `
     <svg width="${iconSize[0]}" height="${iconSize[1]}" viewBox="0 0 ${iconSize[0]} ${iconSize[1]}" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <filter id="shadow-${cacheKey}" x="-50%" y="-50%" width="200%" height="200%">
+        <filter id="shadow-${Math.random().toString(36).substr(2, 9)}" x="-50%" y="-50%" width="200%" height="200%">
           <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.2)"/>
         </filter>
       </defs>
-      <circle cx="${cx}" cy="${cy}" r="${radius}" fill="${iconColor}" stroke="white" stroke-width="3" filter="url(#shadow-${cacheKey})"/>
+      <circle cx="${cx}" cy="${cy}" r="${radius}" fill="${iconColor}" stroke="white" stroke-width="3"/>
       <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central"
             fill="white" font-family="Arial, sans-serif" font-size="${iconSize[0] / 2.2}" font-weight="bold">
         ${displayText}
@@ -177,14 +177,7 @@ function convertLocationDataToShops(locations) {
         agent: location.agentName,
         phone: location.marketNumber,
         createdAt: location.createdAt,
-        status:
-            location.status === 1
-                ? "active"
-                : location.status === 0
-                    ? "pending"
-                    : location.status === 2
-                        ? "inactive"
-                        : "inactive",
+        status: location.status === 1 ? "active" : location.status === 0 ? "pending" : "inactive",
         notes: location.notes,
         latitude: location.latitude,
         longitude: location.longitude,
@@ -192,8 +185,72 @@ function convertLocationDataToShops(locations) {
     }))
 }
 
+// Создание тестовых данных
+function createSampleData() {
+    const sampleLocations = [
+        {
+            marketName: "Магазин Центр",
+            agentName: "Иван Петров",
+            marketNumber: "+7 (495) 123-45-67",
+            latitude: 41.31,
+            longitude: 69.28,
+            status: 1,
+            notes: "Центральный магазин в деловом районе",
+            createdAt: "2024-01-15T10:00:00Z",
+        },
+        {
+            marketName: "Магазин Восток",
+            agentName: "Мария Сидорова",
+            marketNumber: "+7 (495) 234-56-78",
+            latitude: 41.32,
+            longitude: 69.3,
+            status: 0,
+            notes: "Новый магазин на востоке города",
+            createdAt: "2024-01-20T14:30:00Z",
+        },
+        {
+            marketName: "Магазин Запад",
+            agentName: "Алексей Козлов",
+            marketNumber: "+7 (495) 345-67-89",
+            latitude: 41.3,
+            longitude: 69.26,
+            status: 2,
+            notes: "Временно закрыт на ремонт",
+            createdAt: "2024-01-10T09:15:00Z",
+        },
+        {
+            marketName: "Магазин Север",
+            agentName: "Елена Волкова",
+            marketNumber: "+7 (495) 456-78-90",
+            latitude: 41.33,
+            longitude: 69.29,
+            status: 1,
+            notes: "Популярный магазин в жилом районе",
+            createdAt: "2024-01-12T16:45:00Z",
+        },
+        {
+            marketName: "Магазин Юг",
+            agentName: "Дмитрий Орлов",
+            marketNumber: "+7 (495) 567-89-01",
+            latitude: 41.29,
+            longitude: 69.27,
+            status: 1,
+            notes: "Магазин рядом с торговым центром",
+            createdAt: "2024-01-18T11:20:00Z",
+        },
+    ]
+
+    allShops = convertLocationDataToShops(sampleLocations)
+    lastDataHash = generateDataHash(sampleLocations)
+
+    updateUI()
+    updateMap()
+
+    console.log("Загружены тестовые данные:", allShops.length, "магазинов")
+}
+
 // Загрузка данных магазинов с автоматическими обновлениями (оптимизированная)
-const loadShopData = throttle(async (showNotification = false) => {
+async function loadShopData(showNotification = false) {
     try {
         const timestamp = Date.now()
         const url = `locations.json?v=${timestamp}`
@@ -221,15 +278,12 @@ const loadShopData = throttle(async (showNotification = false) => {
             allShops = convertLocationDataToShops(locations)
             lastDataHash = newDataHash
 
-            // Использование requestAnimationFrame для оптимизации обновлений UI
-            requestAnimationFrame(() => {
-                updateUI()
-                updateMap()
-            })
+            updateUI()
+            updateMap()
 
             // Обновление всплывающего окна, если оно открыто
             if (domCache.popupOverlay.classList.contains("active")) {
-                requestAnimationFrame(() => renderShops())
+                renderShops()
             }
 
             // Показать уведомление для изменений данных (не для начальной загрузки)
@@ -241,8 +295,12 @@ const loadShopData = throttle(async (showNotification = false) => {
         }
     } catch (error) {
         console.error("Ошибка загрузки локаций:", error)
+        // Создать тестовые данные если файл не существует
+        if (allShops.length === 0) {
+            createSampleData()
+        }
     }
-}, 500)
+}
 
 // Обновление UI с данными магазинов (оптимизированное)
 function updateUI() {
@@ -266,8 +324,22 @@ function updateUI() {
     updateShopsList()
 }
 
+// Получить текст статуса
+function getStatusText(status) {
+    switch (status) {
+        case "active":
+            return "Активный"
+        case "pending":
+            return "В ожидании"
+        case "inactive":
+            return "Неактивный"
+        default:
+            return "Неизвестно"
+    }
+}
+
 // Обновление списка магазинов в боковой панели (оптимизированное)
-const updateShopsList = debounce(() => {
+function updateShopsList() {
     const displayShops = allShops.slice(0, 8) // Показать первые 8 магазинов в боковой панели
 
     const html = displayShops
@@ -288,20 +360,6 @@ const updateShopsList = debounce(() => {
         .join("")
 
     domCache.shopsList.innerHTML = html
-}, 100)
-
-// Получить текст статуса
-function getStatusText(status) {
-    switch (status) {
-        case "active":
-            return "Активный"
-        case "pending":
-            return "В ожидании"
-        case "inactive":
-            return "Неактивный"
-        default:
-            return "Неизвестно"
-    }
 }
 
 // Выбрать магазин и центрировать карту
@@ -317,6 +375,31 @@ function selectShop(shopId) {
     }
 
     updateShopsList()
+}
+
+// Форматирование даты на русском языке
+function formatDateRussian(dateString) {
+    const months = [
+        "января",
+        "февраля",
+        "марта",
+        "апреля",
+        "мая",
+        "июня",
+        "июля",
+        "августа",
+        "сентября",
+        "октября",
+        "ноября",
+        "декабря",
+    ]
+
+    const date = new Date(dateString)
+    const day = date.getDate()
+    const month = months[date.getMonth()]
+    const year = date.getFullYear()
+
+    return `${day} ${month} ${year} г.`
 }
 
 // Обновление карты (оптимизированное)
@@ -336,9 +419,6 @@ function updateMap() {
         if (group) group.push(shop)
         else groups.push([shop])
     })
-
-    // Создание меток с использованием DocumentFragment для оптимизации
-    const fragment = document.createDocumentFragment()
 
     groups.forEach((group) => {
         const lat = group[0].latitude
@@ -486,31 +566,6 @@ function updateMap() {
         map.geoObjects.add(placemark)
         placemarks.push(placemark)
     })
-}
-
-// Форматирование даты на русском языке
-function formatDateRussian(dateString) {
-    const months = [
-        "января",
-        "февраля",
-        "марта",
-        "апреля",
-        "мая",
-        "июня",
-        "июля",
-        "августа",
-        "сентября",
-        "октября",
-        "ноября",
-        "декабря",
-    ]
-
-    const date = new Date(dateString)
-    const day = date.getDate()
-    const month = months[date.getMonth()]
-    const year = date.getFullYear()
-
-    return `${day} ${month} ${year} г.`
 }
 
 // Инициализация карты
@@ -669,7 +724,7 @@ function createShopCard(shop) {
 }
 
 // Рендеринг магазинов (оптимизированный)
-const renderShops = debounce(() => {
+function renderShops() {
     const startIndex = currentPage * itemsPerPage
     const endIndex = startIndex + itemsPerPage
     const currentShops = allShops.slice(startIndex, endIndex)
@@ -678,7 +733,7 @@ const renderShops = debounce(() => {
     domCache.shopsGrid.innerHTML = html
 
     updatePagination()
-}, 50)
+}
 
 function updatePagination() {
     const totalPages = Math.ceil(allShops.length / itemsPerPage)
@@ -788,9 +843,7 @@ document.addEventListener("keydown", (event) => {
 // Инициализация приложения
 document.addEventListener("DOMContentLoaded", () => {
     initDOMCache()
-    ymaps.load("https://api-maps.yandex.ru/2.1/?lang=ru_RU").then(() => {
-        initMap()
-    })
+    initMap()
 })
 
 // Очистка при выгрузке страницы
@@ -799,25 +852,4 @@ window.addEventListener("beforeunload", () => {
     // Очистка кэшей
     iconCache.clear()
     Object.keys(domCache).forEach((key) => delete domCache[key])
-})
-
-// Оптимизация для мобильных устройств
-if ("ontouchstart" in window) {
-    document.body.classList.add("touch-device")
-}
-
-// Предзагрузка критических ресурсов
-window.addEventListener("load", () => {
-    // Предзагрузка часто используемых иконок
-    const commonIcons = [
-        { color: "#059669", size: [28, 28], text: "М" },
-        { color: "#f59e0b", size: [28, 28], text: "М" },
-        { color: "#dc2626", size: [28, 28], text: "М" },
-        { color: "#3b82f6", size: [36, 36], text: "2" },
-        { color: "#3b82f6", size: [36, 36], text: "3" },
-    ]
-
-    commonIcons.forEach((icon) => {
-        createCustomIcon(icon.color, icon.size, icon.text)
-    })
 })
