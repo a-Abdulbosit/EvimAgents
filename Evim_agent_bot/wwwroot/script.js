@@ -83,6 +83,29 @@ function showUpdateNotification() {
     }, 2000)
 }
 
+// Показать сообщение об ошибке
+function showErrorMessage(message) {
+    domCache.sidebarLoading.style.display = "none"
+    domCache.sidebarContent.innerHTML = `
+    <div style="padding: 2rem; text-align: center; color: #ef4444;">
+      <div style="font-size: 2rem; margin-bottom: 1rem;">⚠️</div>
+      <div style="font-weight: 600; margin-bottom: 0.5rem;">Ошибка загрузки данных</div>
+      <div style="font-size: 0.875rem; line-height: 1.4;">${message}</div>
+      <button onclick="loadShopData()" style="
+        margin-top: 1rem;
+        padding: 0.5rem 1rem;
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 0.375rem;
+        cursor: pointer;
+        font-size: 0.875rem;
+      ">Попробовать снова</button>
+    </div>
+  `
+    domCache.sidebarContent.style.display = "block"
+}
+
 // Функции переключения панели
 function togglePanel() {
     if (isPanelOpen) {
@@ -185,70 +208,6 @@ function convertLocationDataToShops(locations) {
     }))
 }
 
-// Создание тестовых данных
-function createSampleData() {
-    const sampleLocations = [
-        {
-            marketName: "Магазин Центр",
-            agentName: "Иван Петров",
-            marketNumber: "+7 (495) 123-45-67",
-            latitude: 41.31,
-            longitude: 69.28,
-            status: 1,
-            notes: "Центральный магазин в деловом районе",
-            createdAt: "2024-01-15T10:00:00Z",
-        },
-        {
-            marketName: "Магазин Восток",
-            agentName: "Мария Сидорова",
-            marketNumber: "+7 (495) 234-56-78",
-            latitude: 41.32,
-            longitude: 69.3,
-            status: 0,
-            notes: "Новый магазин на востоке города",
-            createdAt: "2024-01-20T14:30:00Z",
-        },
-        {
-            marketName: "Магазин Запад",
-            agentName: "Алексей Козлов",
-            marketNumber: "+7 (495) 345-67-89",
-            latitude: 41.3,
-            longitude: 69.26,
-            status: 2,
-            notes: "Временно закрыт на ремонт",
-            createdAt: "2024-01-10T09:15:00Z",
-        },
-        {
-            marketName: "Магазин Север",
-            agentName: "Елена Волкова",
-            marketNumber: "+7 (495) 456-78-90",
-            latitude: 41.33,
-            longitude: 69.29,
-            status: 1,
-            notes: "Популярный магазин в жилом районе",
-            createdAt: "2024-01-12T16:45:00Z",
-        },
-        {
-            marketName: "Магазин Юг",
-            agentName: "Дмитрий Орлов",
-            marketNumber: "+7 (495) 567-89-01",
-            latitude: 41.29,
-            longitude: 69.27,
-            status: 1,
-            notes: "Магазин рядом с торговым центром",
-            createdAt: "2024-01-18T11:20:00Z",
-        },
-    ]
-
-    allShops = convertLocationDataToShops(sampleLocations)
-    lastDataHash = generateDataHash(sampleLocations)
-
-    updateUI()
-    updateMap()
-
-    console.log("Загружены тестовые данные:", allShops.length, "магазинов")
-}
-
 // Загрузка данных магазинов с автоматическими обновлениями (оптимизированная)
 async function loadShopData(showNotification = false) {
     try {
@@ -295,9 +254,10 @@ async function loadShopData(showNotification = false) {
         }
     } catch (error) {
         console.error("Ошибка загрузки локаций:", error)
-        // Создать тестовые данные если файл не существует
+
+        // Показать сообщение об ошибке в UI
         if (allShops.length === 0) {
-            createSampleData()
+            showErrorMessage("Не удалось загрузить данные магазинов. Проверьте наличие файла locations.json")
         }
     }
 }
@@ -368,10 +328,22 @@ function selectShop(shopId) {
     const shop = allShops.find((s) => s.id === shopId)
 
     if (shop && map) {
-        map.setCenter([shop.latitude, shop.longitude], 15, {
-            duration: 400,
-            timingFunction: "ease-out",
-        })
+        // Center the map and zoom to the selected shop
+        map
+            .setCenter([shop.latitude, shop.longitude], 16, {
+                duration: 600,
+                timingFunction: "ease-out",
+            })
+            .then(() => {
+                // Find and open the balloon for this shop after centering
+                const targetPlacemark = placemarks.find((placemark) => {
+                    const coords = placemark.geometry.getCoordinates()
+                    return Math.abs(coords[0] - shop.latitude) < 0.001 && Math.abs(coords[1] - shop.longitude) < 0.001
+                })
+                if (targetPlacemark) {
+                    targetPlacemark.balloon.open()
+                }
+            })
     }
 
     updateShopsList()
@@ -822,10 +794,9 @@ function viewShopDetails(shopId) {
     const shop = allShops.find((s) => s.id === shopId)
     if (shop && map) {
         closePopup()
+        closePanel() // Close the left sidebar automatically
         selectShop(shopId)
-        if (!isPanelOpen) {
-            openPanel()
-        }
+        // Remove the condition that opens panel - we want it closed
     }
 }
 
