@@ -1,38 +1,89 @@
-﻿// Global variables
+﻿// Глобальные переменные
 let allShops = []
 let currentPage = 0
 const itemsPerPage = 6
 const expandedDescriptions = new Set()
 let selectedShopId = null
 let map = null
-let placemarks = []
+const placemarks = []
 let isPanelOpen = false
 let lastDataHash = null
 
-// Auto-update interval (1 second)
+// Интервал автообновления (1 секунда)
 const AUTO_UPDATE_INTERVAL = 1000
 let updateInterval = null
 
-// Generate hash for data comparison
-function generateDataHash(data) {
-    return JSON.stringify(data)
-        .split("")
-        .reduce((a, b) => {
-            a = (a << 5) - a + b.charCodeAt(0)
-            return a & a
-        }, 0)
+// Кэш для DOM элементов
+const domCache = {}
+
+// Инициализация кэша DOM элементов
+function initDOMCache() {
+    domCache.sidebarSubtitle = document.getElementById("sidebarSubtitle")
+    domCache.activeCount = document.getElementById("activeCount")
+    domCache.pendingCount = document.getElementById("pendingCount")
+    domCache.inactiveCount = document.getElementById("inactiveCount")
+    domCache.popupSubtitle = document.getElementById("popupSubtitle")
+    domCache.sidebarLoading = document.getElementById("sidebarLoading")
+    domCache.sidebarContent = document.getElementById("sidebarContent")
+    domCache.shopsList = document.getElementById("shopsList")
+    domCache.shopsGrid = document.getElementById("shopsGrid")
+    domCache.paginationInfo = document.getElementById("paginationInfo")
+    domCache.paginationControls = document.getElementById("paginationControls")
+    domCache.pagination = document.getElementById("pagination")
+    domCache.updateNotification = document.getElementById("updateNotification")
+    domCache.popupOverlay = document.getElementById("popupOverlay")
+    domCache.sidebar = document.getElementById("sidebar")
+    domCache.panelToggle = document.getElementById("panelToggle")
 }
 
-// Show update notification
+// Дебаунсинг для оптимизации производительности
+function debounce(func, wait) {
+    let timeout
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout)
+            func(...args)
+        }
+        clearTimeout(timeout)
+        timeout = setTimeout(later, wait)
+    }
+}
+
+// Троттлинг для ограничения частоты вызовов
+function throttle(func, limit) {
+    let inThrottle
+    return function () {
+        const args = arguments
+
+        if (!inThrottle) {
+            func.apply(this, args)
+            inThrottle = true
+            setTimeout(() => (inThrottle = false), limit)
+        }
+    }
+}
+
+// Генерация хэша для сравнения данных (��птимизированная)
+function generateDataHash(data) {
+    const str = JSON.stringify(data)
+    let hash = 0
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i)
+        hash = (hash << 5) - hash + char
+        hash = hash & hash // Преобразование в 32-битное целое число
+    }
+    return hash
+}
+
+// Показать уведомление об обновлении
 function showUpdateNotification() {
-    const notification = document.getElementById("updateNotification")
-    notification.classList.add("show")
+    domCache.updateNotification.classList.add("show")
     setTimeout(() => {
-        notification.classList.remove("show")
+        domCache.updateNotification.classList.remove("show")
     }, 2000)
 }
 
-// Panel toggle functions
+// Функции переключения панели
 function togglePanel() {
     if (isPanelOpen) {
         closePanel()
@@ -42,26 +93,20 @@ function togglePanel() {
 }
 
 function openPanel() {
-    const sidebar = document.getElementById("sidebar")
-    const toggle = document.getElementById("panelToggle")
-
-    sidebar.classList.add("open")
-    toggle.classList.add("panel-open")
-    toggle.innerHTML = "📊"
+    domCache.sidebar.classList.add("open")
+    domCache.panelToggle.classList.add("panel-open")
+    domCache.panelToggle.innerHTML = "📊"
     isPanelOpen = true
 }
 
 function closePanel() {
-    const sidebar = document.getElementById("sidebar")
-    const toggle = document.getElementById("panelToggle")
-
-    sidebar.classList.remove("open")
-    toggle.classList.remove("panel-open")
-    toggle.innerHTML = "📊"
+    domCache.sidebar.classList.remove("open")
+    domCache.panelToggle.classList.remove("panel-open")
+    domCache.panelToggle.innerHTML = "📊"
     isPanelOpen = false
 }
 
-// Utility functions
+// Утилитарные функции
 function getDistance(lat1, lon1, lat2, lon2) {
     const R = 6371000
     const toRad = (x) => (x * Math.PI) / 180
@@ -75,49 +120,60 @@ function getDistance(lat1, lon1, lat2, lon2) {
 function getStatusInfo(status) {
     switch (status) {
         case 0:
-            return { text: "Pending", class: "pending", icon: "🕓" }
+            return { text: "В ожидании", class: "pending", icon: "🕓" }
         case 1:
-            return { text: "Active", class: "active", icon: "✅" }
+            return { text: "Активный", class: "active", icon: "✅" }
         case 2:
-            return { text: "Inactive", class: "inactive", icon: "❌" }
+            return { text: "Неактивный", class: "inactive", icon: "❌" }
         default:
-            return { text: "Unknown", class: "review", icon: "❓" }
+            return { text: "Неизвестно", class: "review", icon: "❓" }
     }
 }
 
+// Кэш для SVG иконок
+const iconCache = new Map()
+
 function createCustomIcon(iconColor, iconSize, displayText) {
+    const cacheKey = `${iconColor}-${iconSize[0]}-${iconSize[1]}-${displayText}`
+
+    if (iconCache.has(cacheKey)) {
+        return iconCache.get(cacheKey)
+    }
+
     const radius = iconSize[0] / 2 - 3
     const cx = iconSize[0] / 2
     const cy = iconSize[1] / 2
 
     const svgContent = `
-        <svg width="${iconSize[0]}" height="${iconSize[1]}" viewBox="0 0 ${iconSize[0]} ${iconSize[1]}" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-                <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.2)"/>
-                </filter>
-            </defs>
-            <circle cx="${cx}" cy="${cy}" r="${radius}" fill="${iconColor}" stroke="white" stroke-width="3" filter="url(#shadow)"/>
-            <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central"
-                  fill="white" font-family="Arial, sans-serif" font-size="${iconSize[0] / 2.2}" font-weight="bold">
-                ${displayText}
-            </text>
-        </svg>
-    `
+    <svg width="${iconSize[0]}" height="${iconSize[1]}" viewBox="0 0 ${iconSize[0]} ${iconSize[1]}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="shadow-${cacheKey}" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.2)"/>
+        </filter>
+      </defs>
+      <circle cx="${cx}" cy="${cy}" r="${radius}" fill="${iconColor}" stroke="white" stroke-width="3" filter="url(#shadow-${cacheKey})"/>
+      <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central"
+            fill="white" font-family="Arial, sans-serif" font-size="${iconSize[0] / 2.2}" font-weight="bold">
+        ${displayText}
+      </text>
+    </svg>
+  `
 
-    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgContent)}`
+    const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgContent)}`
+    iconCache.set(cacheKey, dataUrl)
+    return dataUrl
 }
 
-// Data conversion functions
+// Функции преобразования данных
 function convertLocationDataToShops(locations) {
     return locations.map((location, index) => ({
         id: `shop-${index + 1}`,
         name: location.marketName,
         address:
             location.latitude != null && location.longitude != null
-                ? `Coordinates: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
-                : "Coordinates missing",
-        description: location.notes || `${location.marketName} - Partner retail location`,
+                ? `Координаты: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
+                : "Координаты отсутствуют",
+        description: location.notes || `${location.marketName} - Партнерская торговая точка`,
         agent: location.agentName,
         phone: location.marketNumber,
         createdAt: location.createdAt,
@@ -129,8 +185,8 @@ function convertLocationDataToShops(locations) {
     }))
 }
 
-// Load shop data with automatic updates
-async function loadShopData(showNotification = false) {
+// Загрузка данных магазинов с автоматическими обновлениями (оптимизированная)
+const loadShopData = throttle(async (showNotification = false) => {
     try {
         const timestamp = Date.now()
         const url = `locations.json?v=${timestamp}`
@@ -145,86 +201,103 @@ async function loadShopData(showNotification = false) {
         })
 
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`)
+            throw new Error(`HTTP ошибка! статус: ${response.status}`)
         }
 
         const locations = await response.json()
         const newDataHash = generateDataHash(locations)
 
-        // Check if data has changed
+        // Проверка изменения данных
         const dataChanged = lastDataHash !== null && lastDataHash !== newDataHash
 
         if (dataChanged || allShops.length === 0) {
             allShops = convertLocationDataToShops(locations)
             lastDataHash = newDataHash
 
-            updateUI()
-            updateMap()
+            // Использование requestAnimationFrame для оптимизации обновлений UI
+            requestAnimationFrame(() => {
+                updateUI()
+                updateMap()
+            })
 
-            // Update popup if it's open
-            const popup = document.getElementById("popupOverlay")
-            if (popup.classList.contains("active")) {
-                renderShops()
+            // Обновление всплывающего окна, если оно открыто
+            if (domCache.popupOverlay.classList.contains("active")) {
+                requestAnimationFrame(() => renderShops())
             }
 
-            // Show notification for data changes (not initial load)
+            // Показать уведомление для изменений данных (не для начальной загрузки)
             if (showNotification && dataChanged) {
                 showUpdateNotification()
             }
 
-            console.log(`${dataChanged ? "Updated" : "Loaded"} ${allShops.length} shops from locations.json`)
+            console.log(`${dataChanged ? "Обновлено" : "Загружено"} ${allShops.length} магазинов из locations.json`)
         }
     } catch (error) {
-        console.error("Error loading locations:", error)
+        console.error("Ошибка загрузки локаций:", error)
     }
-}
+}, 500)
 
-// Update UI with shop data
+// Обновление UI с данными магазинов (оптимизированное)
 function updateUI() {
     const shopCount = allShops.length
     const activeCount = allShops.filter((s) => s.status === "active").length
     const pendingCount = allShops.filter((s) => s.status === "pending").length
     const inactiveCount = allShops.filter((s) => s.status === "inactive").length
 
-    // Update sidebar
-    document.getElementById("sidebarSubtitle").textContent = `${shopCount} shops in network`
-    document.getElementById("activeCount").textContent = activeCount
-    document.getElementById("pendingCount").textContent = pendingCount
-    document.getElementById("inactiveCount").textContent = inactiveCount
-    document.getElementById("popupSubtitle").textContent = `${shopCount} shops found`
+    // Обновление боковой панели
+    domCache.sidebarSubtitle.textContent = `${shopCount} магазинов в сети`
+    domCache.activeCount.textContent = activeCount
+    domCache.pendingCount.textContent = pendingCount
+    domCache.inactiveCount.textContent = inactiveCount
+    domCache.popupSubtitle.textContent = `Найдено ${shopCount} магазинов`
 
-    // Show content, hide loading
-    document.getElementById("sidebarLoading").style.display = "none"
-    document.getElementById("sidebarContent").style.display = "block"
+    // Показать контент, скрыть загрузку
+    domCache.sidebarLoading.style.display = "none"
+    domCache.sidebarContent.style.display = "block"
 
-    // Update shops list
+    // Обновить список магазинов
     updateShopsList()
 }
 
-// Update shops list in sidebar
-function updateShopsList() {
-    const shopsList = document.getElementById("shopsList")
-    const displayShops = allShops.slice(0, 8) // Show first 8 shops in sidebar
+// Обновление списка магазинов в боковой панели (оптимизированное)
+const updateShopsList = debounce(() => {
+    const displayShops = allShops.slice(0, 8) // Показать первые 8 магазинов в боковой панели
 
-    shopsList.innerHTML = displayShops
+    const html = displayShops
         .map(
             (shop) => `
         <div class="shop-item ${selectedShopId === shop.id ? "selected" : ""}" onclick="selectShop('${shop.id}')">
-            <div class="shop-item-header">
-                <div class="shop-item-name">${shop.name}</div>
-                <div class="shop-item-status ${shop.status}">${shop.status.charAt(0).toUpperCase() + shop.status.slice(1)}</div>
-            </div>
-            <div class="shop-item-details">
-                Agent: ${shop.agent}<br>
-                Phone: ${shop.phone}
-            </div>
+          <div class="shop-item-header">
+            <div class="shop-item-name">${shop.name}</div>
+            <div class="shop-item-status ${shop.status}">${getStatusText(shop.status)}</div>
+          </div>
+          <div class="shop-item-details">
+            Агент: ${shop.agent}<br>
+            Телефон: ${shop.phone}
+          </div>
         </div>
-    `,
+      `,
         )
         .join("")
+
+    domCache.shopsList.innerHTML = html
+}, 100)
+
+// Получить текст статуса
+function getStatusText(status) {
+    switch (status) {
+        case "active":
+            return "Активный"
+        case "pending":
+            return "В ожидании"
+        case "inactive":
+            return "Неактивный"
+        default:
+            return "Неизвестно"
+    }
 }
 
-// Select shop and center map
+// Выбрать магазин и центрировать карту
 function selectShop(shopId) {
     selectedShopId = shopId
     const shop = allShops.find((s) => s.id === shopId)
@@ -239,16 +312,17 @@ function selectShop(shopId) {
     updateShopsList()
 }
 
+// Обновление карты (оптимизированное)
 function updateMap() {
     if (!map) return
 
-    // Clear existing placemarks
+    // Очистка существующих меток
     placemarks.forEach((placemark) => {
         map.geoObjects.remove(placemark)
     })
-    placemarks = []
+    placemarks.length = 0 // Более быстрая очистка массива
 
-    // Group shops by proximity
+    // Группировка магазинов по близости
     const groups = []
     allShops.forEach((shop) => {
         const group = groups.find((g) => getDistance(g[0].latitude, g[0].longitude, shop.latitude, shop.longitude) <= 50)
@@ -256,128 +330,127 @@ function updateMap() {
         else groups.push([shop])
     })
 
+    // Создание меток с использованием DocumentFragment для оптимизации
+    const fragment = document.createDocumentFragment()
+
     groups.forEach((group) => {
         const lat = group[0].latitude
         const lon = group[0].longitude
 
-        // Create balloon content
+        // Создание содержимого всплывающего окна
         const storeCardsHtml = group
-            .map((shop, index) => {
+            .map((shop) => {
                 const statusInfo = getStatusInfo(shop.originalStatus)
                 const yandexGoUrl = `https://3.redirect.appmetrica.yandex.com/route?end-lat=${shop.latitude}&end-lon=${shop.longitude}&appmetrica_tracking_id=1178268795219780156`
 
                 return `
-                <div class="store-card">
-                    <div class="store-header">
-                        <div class="store-name">${shop.name}</div>
-                    </div>
-                    <div class="store-details">
-                        <div class="detail-row">
-                            <div class="detail-icon-wrapper agent">
-                                <span class="detail-icon">👤</span>
-                            </div>
-                            <div class="detail-content">
-                                <span class="detail-label">Agent</span>
-                                <span class="detail-value">${shop.agent}</span>
-                            </div>
-                        </div>
-                        <div class="detail-row">
-                            <div class="detail-icon-wrapper phone">
-                                <span class="detail-icon">📞</span>
-                            </div>
-                            <div class="detail-content">
-                                <span class="detail-label">Phone</span>
-                                <span class="detail-value">
-                                    <a href="tel:${shop.phone}" style="color: #2563eb; text-decoration: none;">
-                                        ${shop.phone}
-                                    </a>
-                                </span>
-                            </div>
-                        </div>
-                        <div class="detail-row">
-                            <div class="detail-icon-wrapper date">
-                                <span class="detail-icon">📅</span>
-                            </div>
-                            <div class="detail-content">
-                                <span class="detail-label">Added</span>
-                                <span class="detail-value">${new Date(shop.createdAt).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                })}</span>
-                            </div>
-                        </div>
-                        <div class="detail-row">
-                            <div class="detail-icon-wrapper status">
-                                <span class="detail-icon">${statusInfo.icon}</span>
-                            </div>
-                            <div class="detail-content">
-                                <span class="detail-label">Status</span>
-                                <span class="detail-value">
-                                    <span class="status-badge ${statusInfo.class}">${statusInfo.text}</span>
-                                </span>
-                            </div>
-                        </div>
-                        ${shop.notes
+          <div class="store-card">
+            <div class="store-header">
+              <div class="store-name">${shop.name}</div>
+            </div>
+            <div class="store-details">
+              <div class="detail-row">
+                <div class="detail-icon-wrapper agent">
+                  <span class="detail-icon">👤</span>
+                </div>
+                <div class="detail-content">
+                  <span class="detail-label">Агент</span>
+                  <span class="detail-value">${shop.agent}</span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-icon-wrapper phone">
+                  <span class="detail-icon">📞</span>
+                </div>
+                <div class="detail-content">
+                  <span class="detail-label">Телефон</span>
+                  <span class="detail-value">
+                    <a href="tel:${shop.phone}" style="color: #2563eb; text-decoration: none;">
+                      ${shop.phone}
+                    </a>
+                  </span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-icon-wrapper date">
+                  <span class="detail-icon">📅</span>
+                </div>
+                <div class="detail-content">
+                  <span class="detail-label">Добавлено</span>
+                  <span class="detail-value">${formatDateRussian(shop.createdAt)}</span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-icon-wrapper status">
+                  <span class="detail-icon">${statusInfo.icon}</span>
+                </div>
+                <div class="detail-content">
+                  <span class="detail-label">Статус</span>
+                  <span class="detail-value">
+                    <span class="status-badge ${statusInfo.class}">${statusInfo.text}</span>
+                  </span>
+                </div>
+              </div>
+              ${shop.notes
                         ? `
-                            <div class="detail-row">
-                                <div class="detail-icon-wrapper notes">
-                                    <span class="detail-icon">📝</span>
-                                </div>
-                                <div class="detail-content">
-                                    <span class="detail-label">Notes</span>
-                                    <span class="detail-value">${shop.notes}</span>
-                                </div>
-                            </div>
-                        `
+                <div class="detail-row">
+                  <div class="detail-icon-wrapper notes">
+                    <span class="detail-icon">📝</span>
+                  </div>
+                  <div class="detail-content">
+                    <span class="detail-label">Заметки</span>
+                    <span class="detail-value">${shop.notes}</span>
+                  </div>
+                </div>
+              `
                         : ""
                     }
-                        <a href="${yandexGoUrl}" target="_blank" class="route-button">
-                            🚗 Build Route
-                        </a>
-                    </div>
-                </div>
-            `
+              <a href="${yandexGoUrl}" target="_blank" class="route-button">
+                🚗 Построить маршрут
+              </a>
+            </div>
+          </div>
+        `
             })
             .join("")
 
         const content = `
-            <div class="modern-balloon">
-                <div class="balloon-header">
-                    <h3 class="balloon-main-title">
-                        ${group.length > 1 ? `Shop Group` : "Partner Shop"}
-                    </h3>
-                    ${group.length > 1 ? `<p class="balloon-subtitle">${group.length} shops in this area</p>` : ""}
-                </div>
-                <div class="balloon-content">
-                    ${storeCardsHtml}
-                </div>
-            </div>
-        `
+      <div class="modern-balloon">
+        <div class="balloon-header">
+          <h3 class="balloon-main-title">
+            ${group.length > 1 ? `Группа магазинов` : "Партнерский магазин"}
+          </h3>
+          ${group.length > 1 ? `<p class="balloon-subtitle">${group.length} магазинов в этой области</p>` : ""}
+        </div>
+        <div class="balloon-content">
+          ${storeCardsHtml}
+        </div>
+      </div>
+    `
 
         const getIconColor = (status) => {
             switch (status) {
                 case 0:
-                    return "#f59e0b" // pending - yellow
+                    return "#f59e0b" // в ожидании - желтый
                 case 1:
-                    return "#059669" // active - green
+                    return "#059669" // активный - зеленый
                 case 2:
-                    return "#dc2626" // inactive - red
+                    return "#dc2626" // неактивный - красный
                 default:
-                    return "#6b7280" // unknown - gray
+                    return "#6b7280" // неизвестно - серый
             }
         }
 
         const iconColor = group.length === 1 ? getIconColor(group[0].originalStatus) : "#3b82f6"
         const iconSize = group.length > 1 ? [36, 36] : [28, 28]
         const iconOffset = group.length > 1 ? [-18, -36] : [-14, -28]
-        const displayText = group.length > 1 ? group.length.toString() : "M"
+        const displayText = group.length > 1 ? group.length.toString() : "М"
 
         const placemark = new ymaps.Placemark(
             [lat, lon],
             {
                 balloonContent: content,
-                hintContent: group.length > 1 ? `Group of ${group.length} shops` : group[0].name,
+                hintContent: group.length > 1 ? `Группа из ${group.length} магазинов` : group[0].name,
             },
             {
                 iconLayout: "default#image",
@@ -408,7 +481,32 @@ function updateMap() {
     })
 }
 
-// Initialize map
+// Форматирование даты на русском языке
+function formatDateRussian(dateString) {
+    const months = [
+        "января",
+        "февраля",
+        "марта",
+        "апреля",
+        "мая",
+        "июня",
+        "июля",
+        "августа",
+        "сентября",
+        "октября",
+        "ноября",
+        "декабря",
+    ]
+
+    const date = new Date(dateString)
+    const day = date.getDate()
+    const month = months[date.getMonth()]
+    const year = date.getFullYear()
+
+    return `${day} ${month} ${year} г.`
+}
+
+// Инициализация карты
 function initMap() {
     ymaps.ready(() => {
         map = new ymaps.Map(
@@ -442,22 +540,22 @@ function initMap() {
             map.balloon.close()
         })
 
-        // Load initial data
+        // Загрузка начальных данных
         loadShopData()
 
-        // Start auto-update
+        // Запуск автообновления
         startAutoUpdate()
     })
 }
 
-// Start automatic updates
+// Запуск автоматических обновлений
 function startAutoUpdate() {
     updateInterval = setInterval(() => {
         loadShopData(true)
     }, AUTO_UPDATE_INTERVAL)
 }
 
-// Stop automatic updates
+// Остановка автоматических обновлений
 function stopAutoUpdate() {
     if (updateInterval) {
         clearInterval(updateInterval)
@@ -465,7 +563,7 @@ function stopAutoUpdate() {
     }
 }
 
-// Popup functions
+// Функции всплывающего окна
 function truncateText(text, maxLength = 120) {
     if (text.length <= maxLength) return text
     return text.substring(0, maxLength) + "..."
@@ -480,122 +578,112 @@ function toggleDescription(shopId) {
     renderShops()
 }
 
-function formatDate(dateString) {
-    return new Date(dateString).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-    })
-}
-
 function createShopCard(shop) {
     const isExpanded = expandedDescriptions.has(shop.id)
     const description = isExpanded ? shop.description : truncateText(shop.description)
     const needsExpansion = shop.description.length > 120
 
     return `
-        <div class="shop-card">
-            <div class="shop-header">
-                <h3 class="shop-name">${shop.name}</h3>
-                <span class="status-badge ${shop.status}">${shop.status.charAt(0).toUpperCase() + shop.status.slice(1)}</span>
+    <div class="shop-card">
+      <div class="shop-header">
+        <h3 class="shop-name">${shop.name}</h3>
+        <span class="status-badge ${shop.status}">${getStatusText(shop.status)}</span>
+      </div>
+      
+      <div class="shop-details">
+        <div class="detail-row">
+          <div class="detail-icon address">📍</div>
+          <div class="detail-content">
+            <div class="detail-label">Адрес</div>
+            <div class="detail-value">${shop.address}</div>
+          </div>
+        </div>
+        
+        <div class="detail-row">
+          <div class="detail-icon agent">👤</div>
+          <div class="detail-content">
+            <div class="detail-label">Агент</div>
+            <div class="detail-value">${shop.agent}</div>
+          </div>
+        </div>
+        
+        <div class="detail-row">
+          <div class="detail-icon phone">📞</div>
+          <div class="detail-content">
+            <div class="detail-label">Телефон</div>
+            <div class="detail-value">
+              <a href="tel:${shop.phone}" class="phone-link">${shop.phone}</a>
             </div>
-            
-            <div class="shop-details">
-                <div class="detail-row">
-                    <div class="detail-icon address">📍</div>
-                    <div class="detail-content">
-                        <div class="detail-label">Address</div>
-                        <div class="detail-value">${shop.address}</div>
-                    </div>
-                </div>
-                
-                <div class="detail-row">
-                    <div class="detail-icon agent">👤</div>
-                    <div class="detail-content">
-                        <div class="detail-label">Agent</div>
-                        <div class="detail-value">${shop.agent}</div>
-                    </div>
-                </div>
-                
-                <div class="detail-row">
-                    <div class="detail-icon phone">📞</div>
-                    <div class="detail-content">
-                        <div class="detail-label">Phone</div>
-                        <div class="detail-value">
-                            <a href="tel:${shop.phone}" class="phone-link">${shop.phone}</a>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="detail-row">
-                    <div class="detail-icon notes">📝</div>
-                    <div class="detail-content">
-                        <div class="detail-label">Description</div>
-                        <div class="detail-value description-text">
-                            ${description}
-                            ${needsExpansion
+          </div>
+        </div>
+        
+        <div class="detail-row">
+          <div class="detail-icon notes">📝</div>
+          <div class="detail-content">
+            <div class="detail-label">Описание</div>
+            <div class="detail-value description-text">
+              ${description}
+              ${needsExpansion
             ? `
-                                <button class="expand-btn" onclick="toggleDescription('${shop.id}')">
-                                    ${isExpanded ? "Show less" : "Show more"}
-                                </button>
-                            `
-            : ""
-        }
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="detail-row">
-                    <div class="detail-icon date">📅</div>
-                    <div class="detail-content">
-                        <div class="detail-label">Added</div>
-                        <div class="detail-value">${formatDate(shop.createdAt)}</div>
-                    </div>
-                </div>
-                
-                ${shop.notes && shop.notes !== shop.description
-            ? `
-                    <div class="notes-section">
-                        <div class="detail-label">Notes</div>
-                        <div class="detail-value description-text">${shop.notes}</div>
-                    </div>
+                  <button class="expand-btn" onclick="toggleDescription('${shop.id}')">
+                    ${isExpanded ? "Показать меньше" : "Показать больше"}
+                  </button>
                 `
             : ""
         }
             </div>
-            
-            <button class="view-details-btn" onclick="viewShopDetails('${shop.id}')">
-                View on Map
-            </button>
+          </div>
         </div>
-    `
+        
+        <div class="detail-row">
+          <div class="detail-icon date">📅</div>
+          <div class="detail-content">
+            <div class="detail-label">Добавлено</div>
+            <div class="detail-value">${formatDateRussian(shop.createdAt)}</div>
+          </div>
+        </div>
+        
+        ${shop.notes && shop.notes !== shop.description
+            ? `
+            <div class="notes-section">
+              <div class="detail-label">Заметки</div>
+              <div class="detail-value description-text">${shop.notes}</div>
+            </div>
+          `
+            : ""
+        }
+      </div>
+      
+      <button class="view-details-btn" onclick="viewShopDetails('${shop.id}')">
+        Показать на карте
+      </button>
+    </div>
+  `
 }
 
-function renderShops() {
+// Рендеринг магазинов (оптимизированный)
+const renderShops = debounce(() => {
     const startIndex = currentPage * itemsPerPage
     const endIndex = startIndex + itemsPerPage
     const currentShops = allShops.slice(startIndex, endIndex)
 
-    const shopsGrid = document.getElementById("shopsGrid")
-    shopsGrid.innerHTML = currentShops.map((shop) => createShopCard(shop)).join("")
+    const html = currentShops.map((shop) => createShopCard(shop)).join("")
+    domCache.shopsGrid.innerHTML = html
 
     updatePagination()
-}
+}, 50)
 
 function updatePagination() {
     const totalPages = Math.ceil(allShops.length / itemsPerPage)
     const startIndex = currentPage * itemsPerPage
     const endIndex = Math.min(startIndex + itemsPerPage, allShops.length)
 
-    document.getElementById("paginationInfo").textContent =
-        `Showing ${startIndex + 1} to ${endIndex} of ${allShops.length} shops`
+    domCache.paginationInfo.textContent = `Показано с ${startIndex + 1} по ${endIndex} из ${allShops.length} магазинов`
 
-    const pagination = document.getElementById("pagination")
-    pagination.style.display = totalPages > 1 ? "flex" : "none"
+    domCache.pagination.style.display = totalPages > 1 ? "flex" : "none"
 
     if (totalPages <= 1) return
 
-    const controls = document.getElementById("paginationControls")
     let html = ""
 
     html += `<button class="pagination-btn" ${currentPage === 0 ? "disabled" : ""} onclick="goToPage(${currentPage - 1})">‹</button>`
@@ -621,7 +709,7 @@ function updatePagination() {
 
     html += `<button class="pagination-btn" ${currentPage === totalPages - 1 ? "disabled" : ""} onclick="goToPage(${currentPage + 1})">›</button>`
 
-    controls.innerHTML = html
+    domCache.paginationControls.innerHTML = html
 }
 
 function goToPage(page) {
@@ -630,8 +718,8 @@ function goToPage(page) {
         currentPage = page
         renderShops()
 
-        // Scroll to top of popup content when changing pages
-        const popupContent = document.getElementById("popupOverlay").querySelector(".popup-content")
+        // Прокрутка к верху содержимого всплывающего окна при смене страниц
+        const popupContent = domCache.popupOverlay.querySelector(".popup-content")
         if (popupContent) {
             popupContent.scrollTop = 0
         }
@@ -645,13 +733,12 @@ function openPopup() {
     expandedDescriptions.clear()
     renderShops()
 
-    const overlay = document.getElementById("popupOverlay")
-    overlay.classList.add("active")
+    domCache.popupOverlay.classList.add("active")
     document.body.style.overflow = "hidden"
 
-    // Ensure popup content starts from the top
+    // Убедиться, что содержимое всплывающего окна начинается сверху
     setTimeout(() => {
-        const popupContent = overlay.querySelector(".popup-content")
+        const popupContent = domCache.popupOverlay.querySelector(".popup-content")
         if (popupContent) {
             popupContent.scrollTop = 0
         }
@@ -659,8 +746,7 @@ function openPopup() {
 }
 
 function closePopup() {
-    const overlay = document.getElementById("popupOverlay")
-    overlay.classList.remove("active")
+    domCache.popupOverlay.classList.remove("active")
     document.body.style.overflow = "unset"
 }
 
@@ -681,10 +767,10 @@ function viewShopDetails(shopId) {
     }
 }
 
-// Keyboard event handlers
+// Обработчики событий клавиатуры
 document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
-        if (document.getElementById("popupOverlay").classList.contains("active")) {
+        if (domCache.popupOverlay.classList.contains("active")) {
             closePopup()
         } else if (isPanelOpen) {
             closePanel()
@@ -692,12 +778,39 @@ document.addEventListener("keydown", (event) => {
     }
 })
 
-// Initialize the application
+// Инициализация приложения
 document.addEventListener("DOMContentLoaded", () => {
-    initMap()
+    initDOMCache()
+    ymaps.load("https://api-maps.yandex.ru/2.1/?lang=ru_RU").then(() => {
+        initMap()
+    })
 })
 
-// Cleanup on page unload
+// Очистка при выгрузке страницы
 window.addEventListener("beforeunload", () => {
     stopAutoUpdate()
+    // Очистка кэшей
+    iconCache.clear()
+    Object.keys(domCache).forEach((key) => delete domCache[key])
+})
+
+// Оптимизация для мобильных устройств
+if ("ontouchstart" in window) {
+    document.body.classList.add("touch-device")
+}
+
+// Предзагрузка критических ресурсов
+window.addEventListener("load", () => {
+    // Предзагрузка часто используемых иконок
+    const commonIcons = [
+        { color: "#059669", size: [28, 28], text: "М" },
+        { color: "#f59e0b", size: [28, 28], text: "М" },
+        { color: "#dc2626", size: [28, 28], text: "М" },
+        { color: "#3b82f6", size: [36, 36], text: "2" },
+        { color: "#3b82f6", size: [36, 36], text: "3" },
+    ]
+
+    commonIcons.forEach((icon) => {
+        createCustomIcon(icon.color, icon.size, icon.text)
+    })
 })
