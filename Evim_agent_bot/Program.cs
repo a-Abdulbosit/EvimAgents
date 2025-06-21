@@ -1,43 +1,53 @@
-﻿using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.FileProviders;
-using Evim_agent_bot;
-using Evim_agent_bot.YandexMapLibrary.Services;
+﻿using Evim_agent_bot.YandexMapLibrary.Services;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.FileProviders;
 using System.Text.Json;
 
-var builder = WebApplication.CreateBuilder(args);
-var app = builder.Build();
-
-// ✅ Load DB connection string from environment
-var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING");
-
-// ✅ Serve static files (index.html, CSS, JS)
-app.UseDefaultFiles();
-app.UseStaticFiles(new StaticFileOptions
+public static partial class Program
 {
-    FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot")),
-    RequestPath = ""
-});
-
-// ✅ API endpoint: /locations.json returns DB data
-app.MapGet("/locations.json", async () =>
-{
-    var db = new DbStorageService(connectionString);
-    var locations = await db.GetAllLocationsAsync();
-
-    return Results.Json(locations, new JsonSerializerOptions
+    private static void Main(string[] args)
     {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    });
-});
+        var builder = WebApplication.CreateBuilder(args);
 
-// ✅ Start Telegram bot
-var botToken = Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN")
-               ?? "7112655258:AAGypb28Fosi0tgoe9LqOiZRY41Rm2fdaVk"; // Optional fallback
+        var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING");
+        var iboxConnectionString = "Host=airnet;Port=5432;Database=evim_db;Username=friday;Password=3331";
 
-var botHandler = new TelegramBotHandler(botToken, connectionString);
-botHandler.Start();
+        var app = builder.Build();
 
-// ✅ Run app
-app.Run();
+        app.UseDefaultFiles();
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot")),
+            RequestPath = ""
+        });
+
+        // ✅ Serve map data
+        app.MapGet("/locations.json", async () =>
+        {
+            var db = new DbStorageService(connectionString);
+            var locations = await db.GetAllLocationsAsync();
+
+            return Results.Json(locations, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+        });
+
+        // ✅ Sync totals from ibox DB
+        app.MapPost("/location.json", async () =>
+        {
+            var syncService = new MarketSyncService(connectionString, iboxConnectionString);
+            await syncService.SyncTotalsAsync();
+            return Results.Ok("Synced all totals");
+        });
+
+        var botToken = Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN")
+                       ?? "your_fallback_token_here";
+
+        var botHandler = new TelegramBotHandler(botToken, connectionString);
+        botHandler.Start();
+
+        app.Run();
+    }
+}

@@ -401,6 +401,9 @@ function convertLocationDataToShops(locations) {
         latitude: location.latitude,
         longitude: location.longitude,
         originalStatus: location.status,
+        clientId: location.clientId,
+        totalUsd: location.totalUsd || 0,
+        telegramUserId: location.telegramUserId,
     }))
 }
 
@@ -635,6 +638,29 @@ function updateMap() {
                       ${shop.phone}
                     </a>
                   </span>
+                </div>
+              </div>
+              ${shop.clientId
+                        ? `
+                  <div class="detail-row">
+                    <div class="detail-icon-wrapper client">
+                      <span class="detail-icon">🆔</span>
+                    </div>
+                    <div class="detail-content">
+                      <span class="detail-label">ID Клиента</span>
+                      <span class="detail-value">${shop.clientId}</span>
+                    </div>
+                  </div>
+                `
+                        : ""
+                    }
+              <div class="detail-row">
+                <div class="detail-icon-wrapper money">
+                  <span class="detail-icon">💰</span>
+                </div>
+                <div class="detail-content">
+                  <span class="detail-label">Общая сумма</span>
+                  <span class="detail-value">$${shop.totalUsd.toFixed(2)}</span>
                 </div>
               </div>
               <div class="detail-row">
@@ -896,6 +922,27 @@ function createShopCard(shop) {
             <div class="detail-value">
               <a href="tel:${shop.phone}" class="phone-link">${shop.phone}</a>
             </div>
+          </div>
+        </div>
+        
+        ${shop.clientId
+            ? `
+            <div class="detail-row">
+              <div class="detail-icon client">🆔</div>
+              <div class="detail-content">
+                <div class="detail-label">ID Клиента</div>
+                <div class="detail-value">${shop.clientId}</div>
+              </div>
+            </div>
+          `
+            : ""
+        }
+
+        <div class="detail-row">
+          <div class="detail-icon money">💰</div>
+          <div class="detail-content">
+            <div class="detail-label">Общая сумма</div>
+            <div class="detail-value">$${shop.totalUsd.toFixed(2)}</div>
           </div>
         </div>
         
