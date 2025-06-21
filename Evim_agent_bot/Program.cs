@@ -35,7 +35,7 @@ public static partial class Program
         });
 
         // ✅ Sync totals from ibox DB
-        app.MapPost("/location.json", async () =>
+        app.MapPost("/sync", async () =>
         {
             var syncService = new MarketSyncService(connectionString, iboxConnectionString);
             await syncService.SyncTotalsAsync();

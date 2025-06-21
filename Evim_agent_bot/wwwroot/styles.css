@@ -595,14 +595,6 @@ body {
         background: #fed7aa;
     }
 
-    .detail-icon.client {
-        background: #e0e7ff;
-    }
-
-    .detail-icon.money {
-        background: #fef3c7;
-    }
-
 .detail-content {
     flex: 1;
     min-width: 0;
@@ -859,14 +851,6 @@ body {
 
     .detail-icon-wrapper.phone {
         background-color: #ecfdf5;
-    }
-
-    .detail-icon-wrapper.client {
-        background-color: #e0e7ff;
-    }
-
-    .detail-icon-wrapper.money {
-        background-color: #fef3c7;
     }
 
 .route-button {
