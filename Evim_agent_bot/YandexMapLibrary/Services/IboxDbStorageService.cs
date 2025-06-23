@@ -66,7 +66,6 @@ public class MarketSyncService
             }
         }
     }
-
     private async Task<long?> GetIboxClientIdByPhoneAsync(string phone)
     {
         try
@@ -160,7 +159,7 @@ public class MarketSyncService
             using var conn = new NpgsqlConnection(_iboxDbConnection);
             await conn.OpenAsync();
 
-            var sql = "SELECT price FROM sales_detailed WHERE outlet_id = @outlet_id";
+            var sql = "SELECT total FROM sales_detailed WHERE outlet_id = @outlet_id";
 
             using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("outlet_id", clientId);
