@@ -1,5 +1,6 @@
 ﻿using Npgsql;
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 public class MarketSyncService
 {
@@ -41,7 +42,10 @@ public class MarketSyncService
             {
                 long? iboxClientId = await GetIboxClientIdByPhoneAsync(phone);
                 if (iboxClientId == null)
+                {
+                    Console.WriteLine($"❌ Client not found for phone: {phone}");
                     continue;
+                }
 
                 var usdTotal = await GetUsdTotalFromSalesAsync(iboxClientId.Value);
 
@@ -54,11 +58,11 @@ public class MarketSyncService
 
                 await updateCmd.ExecuteNonQueryAsync();
 
-                Console.WriteLine($"Updated {phone}: ClientId={iboxClientId}, TotalUsd={usdTotal}");
+                Console.WriteLine($"✅ Updated {phone}: ClientId={iboxClientId}, TotalUsd={usdTotal}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error syncing {phone}: {ex.Message}");
+                Console.WriteLine($"❌ Error syncing {phone}: {ex.Message}");
             }
         }
     }
@@ -70,17 +74,81 @@ public class MarketSyncService
             using var conn = new NpgsqlConnection(_iboxDbConnection);
             await conn.OpenAsync();
 
-            var sql = "SELECT id FROM clients WHERE phone_number = @phone LIMIT 1";
+            // Normalize phone number - remove all non-digits
+            var normalizedPhone = Regex.Replace(phone, @"[^\d]", "");
 
-            using var cmd = new NpgsqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("phone", phone);
+            // Try different phone number formats
+            var phoneFormats = new List<string>();
 
-            var result = await cmd.ExecuteScalarAsync();
-            return result is long id ? id : null;
+            // Original phone
+            phoneFormats.Add(phone);
+
+            // With + prefix
+            if (!phone.StartsWith("+"))
+                phoneFormats.Add("+" + phone);
+
+            // Without + prefix
+            if (phone.StartsWith("+"))
+                phoneFormats.Add(phone.Substring(1));
+
+            // Normalized version
+            phoneFormats.Add(normalizedPhone);
+
+            // With +998 prefix if it's missing
+            if (normalizedPhone.Length == 9 && !normalizedPhone.StartsWith("998"))
+                phoneFormats.Add("+998" + normalizedPhone);
+
+            // Without country code if it has one
+            if (normalizedPhone.StartsWith("998") && normalizedPhone.Length == 12)
+                phoneFormats.Add(normalizedPhone.Substring(3));
+
+            foreach (var phoneFormat in phoneFormats.Distinct())
+            {
+                // Try contacts column first
+                var sql = "SELECT id FROM clients WHERE contacts = @phone LIMIT 1";
+                using var cmd = new NpgsqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("phone", phoneFormat);
+
+                var result = await cmd.ExecuteScalarAsync();
+                if (result is long id)
+                {
+                    Console.WriteLine($"✅ Found client ID {id} for phone {phoneFormat} in contacts column");
+                    return id;
+                }
+
+                // Try phone_number column
+                sql = "SELECT id FROM clients WHERE phone_number = @phone LIMIT 1";
+                cmd.CommandText = sql;
+                cmd.Parameters.Clear();
+                cmd.Parameters.AddWithValue("phone", phoneFormat);
+
+                result = await cmd.ExecuteScalarAsync();
+                if (result is long id2)
+                {
+                    Console.WriteLine($"✅ Found client ID {id2} for phone {phoneFormat} in phone_number column");
+                    return id2;
+                }
+
+                // Try with LIKE for partial matches
+                sql = "SELECT id FROM clients WHERE contacts LIKE @phone OR phone_number LIKE @phone LIMIT 1";
+                cmd.CommandText = sql;
+                cmd.Parameters.Clear();
+                cmd.Parameters.AddWithValue("phone", "%" + phoneFormat + "%");
+
+                result = await cmd.ExecuteScalarAsync();
+                if (result is long id3)
+                {
+                    Console.WriteLine($"✅ Found client ID {id3} for phone {phoneFormat} with LIKE search");
+                    return id3;
+                }
+            }
+
+            Console.WriteLine($"❌ No client found for phone: {phone} (tried formats: {string.Join(", ", phoneFormats)})");
+            return null;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error getting client ID for {phone}: {ex.Message}");
+            Console.WriteLine($"❌ Error getting client ID for {phone}: {ex.Message}");
             return null;
         }
     }
@@ -100,22 +168,33 @@ public class MarketSyncService
             using var reader = await cmd.ExecuteReaderAsync();
 
             decimal total = 0;
+            int recordCount = 0;
 
             while (await reader.ReadAsync())
             {
+                recordCount++;
                 var raw = reader.GetString(0).Replace(",", ".").Trim();
 
                 if (decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var amount))
                 {
-                    total += amount > 100 ? Math.Round(amount / _exchangeRate, 2) : amount;
+                    // If amount is greater than 100, assume it's in UZS and convert to USD
+                    var usdAmount = amount > 100 ? Math.Round(amount / _exchangeRate, 2) : amount;
+                    total += usdAmount;
+
+                    Console.WriteLine($"   Sale record: {raw} -> ${usdAmount}");
+                }
+                else
+                {
+                    Console.WriteLine($"   ⚠️ Could not parse price: {raw}");
                 }
             }
 
+            Console.WriteLine($"   📊 Total from {recordCount} sales records: ${Math.Round(total, 2)}");
             return Math.Round(total, 2);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error getting sales total for client {clientId}: {ex.Message}");
+            Console.WriteLine($"❌ Error getting sales total for client {clientId}: {ex.Message}");
             return 0;
         }
     }

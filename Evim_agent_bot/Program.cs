@@ -7,7 +7,7 @@ using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING")
+var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING") 
     ?? "Host=dpg-d19s7015pdvs73a52p50-a;Port=5432;Database=evim_db;Username=evim_db_user;Password=zs6QbkYpzIV7OJsK5hAfDmCHeINezK3a;SSL Mode=Require;Trust Server Certificate=true";
 
 var iboxConnectionString = "Host=airnet;Port=5432;Database=evim_db;Username=friday;Password=3331";
@@ -37,9 +37,45 @@ app.MapGet("/locations.json", async () =>
 // ✅ POST endpoint for syncing totals from ibox → main DB
 app.MapPost("/sync", async () =>
 {
+    Console.WriteLine("🔄 Starting sync process...");
     var syncService = new MarketSyncService(connectionString, iboxConnectionString);
     await syncService.SyncTotalsAsync();
+    Console.WriteLine("✅ Sync process completed");
     return Results.Ok("Synced all totals");
+});
+
+// ✅ GET endpoint to manually sync a specific phone number for testing
+app.MapGet("/sync/{phone}", async (string phone) =>
+{
+    Console.WriteLine($"🔄 Testing sync for phone: {phone}");
+    var syncService = new MarketSyncService(connectionString, iboxConnectionString);
+    
+    // Create a test sync for just this phone
+    using var mainConn = new Npgsql.NpgsqlConnection(connectionString);
+    await mainConn.OpenAsync();
+    
+    var selectSql = "SELECT client_id, market_number FROM market_locations WHERE market_number = @phone";
+    using var selectCmd = new Npgsql.NpgsqlCommand(selectSql, mainConn);
+    selectCmd.Parameters.AddWithValue("phone", phone);
+    
+    using var reader = await selectCmd.ExecuteReaderAsync();
+    if (await reader.ReadAsync())
+    {
+        var clientId = reader.IsDBNull(0) ? (long?)null : reader.GetInt64(0);
+        var phoneFromDb = reader.GetString(1);
+        await reader.CloseAsync();
+        
+        Console.WriteLine($"📱 Found phone in database: {phoneFromDb}");
+        
+        // Test the sync for this specific phone
+        await syncService.SyncTotalsAsync();
+        
+        return Results.Ok($"Tested sync for phone: {phone}");
+    }
+    else
+    {
+        return Results.NotFound($"Phone {phone} not found in database");
+    }
 });
 
 // ✅ Start Telegram bot
