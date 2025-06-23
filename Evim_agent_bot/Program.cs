@@ -1,13 +1,10 @@
-﻿using Evim_agent_bot.YandexMapLibrary.Services;
+﻿using Evim_agent_bot;
+using Evim_agent_bot.YandexMapLibrary.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.FileProviders;
 using System.Text.Json;
 
-public static partial class Program
-{
-    private static void Main(string[] args)
-    {
         var builder = WebApplication.CreateBuilder(args);
 
         var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING");
@@ -15,6 +12,7 @@ public static partial class Program
 
         var app = builder.Build();
 
+        // ✅ Serve index.html, styles.css, script.js from wwwroot
         app.UseDefaultFiles();
         app.UseStaticFiles(new StaticFileOptions
         {
@@ -22,7 +20,7 @@ public static partial class Program
             RequestPath = ""
         });
 
-        // ✅ Serve map data
+        // ✅ GET endpoint for frontend: returns market locations
         app.MapGet("/locations.json", async () =>
         {
             var db = new DbStorageService(connectionString);
@@ -34,7 +32,7 @@ public static partial class Program
             });
         });
 
-        // ✅ Sync totals from ibox DB
+        // ✅ POST endpoint for syncing totals from ibox → main DB
         app.MapPost("/sync", async () =>
         {
             var syncService = new MarketSyncService(connectionString, iboxConnectionString);
@@ -42,12 +40,12 @@ public static partial class Program
             return Results.Ok("Synced all totals");
         });
 
+        // ✅ Start Telegram bot
         var botToken = Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN")
-                       ?? "your_fallback_token_here";
+                       ?? "7112655258:AAGypb28Fosi0tgoe9LqOiZRY41Rm2fdaVk";
 
         var botHandler = new TelegramBotHandler(botToken, connectionString);
         botHandler.Start();
 
+        // ✅ Start the web app
         app.Run();
-    }
-}
