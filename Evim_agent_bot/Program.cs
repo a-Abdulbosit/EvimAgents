@@ -3,6 +3,7 @@ using Evim_agent_bot.YandexMapLibrary.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.FileProviders;
+using Npgsql;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -43,7 +44,44 @@ app.MapPost("/sync", async () =>
     Console.WriteLine("✅ Sync process completed");
     return Results.Ok("Synced all totals");
 });
+app.MapPost("/update-notes", async (UpdateNotesRequest request) =>
+{
+    try
+    {
+        using var conn = new NpgsqlConnection(connectionString);
+        await conn.OpenAsync();
 
+        var sql = @"
+            UPDATE market_locations 
+            SET notes = @notes 
+            WHERE telegram_user_id = @telegram_user_id 
+            AND market_number = @market_number";
+
+        using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("notes", (object?)request.Notes ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("telegram_user_id", request.TelegramUserId);
+        cmd.Parameters.AddWithValue("market_number", request.MarketNumber);
+
+        var rowsAffected = await cmd.ExecuteNonQueryAsync();
+
+        if (rowsAffected == 0)
+        {
+            return Results.NotFound("Магазин не найден");
+        }
+
+        Console.WriteLine($"✅ Updated notes for shop {request.MarketNumber}: {request.Notes}");
+        return Results.Ok(new { success = true, message = "Заметки успешно обновлены" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error updating notes: {ex.Message}");
+        return Results.Problem(
+            detail: ex.Message,
+            statusCode: 500,
+            title: "Update Notes Error"
+        );
+    }
+});
 // ✅ GET endpoint to manually sync a specific phone number for testing
 app.MapGet("/sync/{phone}", async (string phone) =>
 {
@@ -87,3 +125,4 @@ botHandler.Start();
 
 // ✅ Start the web app
 app.Run();
+public record UpdateNotesRequest(long TelegramUserId, string MarketNumber, string? Notes);

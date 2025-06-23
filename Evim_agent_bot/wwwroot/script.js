@@ -407,6 +407,119 @@ function convertLocationDataToShops(locations) {
     }))
 }
 
+// Функции для редактирования заметок
+async function updateShopNotes(shopId, newNotes) {
+    try {
+        const shop = allShops.find((s) => s.id === shopId)
+        if (!shop) {
+            throw new Error("Магазин не найден")
+        }
+
+        // Найти оригинальную запись по telegramUserId и phone
+        const response = await fetch("/update-notes", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                telegramUserId: shop.telegramUserId,
+                marketNumber: shop.phone,
+                notes: newNotes,
+            }),
+        })
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+
+        // Обновить локальные данные
+        shop.notes = newNotes
+        shop.description = newNotes || `${shop.name} - Партнерская торговая точка`
+
+        // Обновить UI
+        updateMap()
+        if (domCache.popupOverlay.classList.contains("active")) {
+            renderShops()
+        }
+
+        showLocationNotification("Заметки успешно обновлены", "success")
+        return true
+    } catch (error) {
+        console.error("Ошибка обновления заметок:", error)
+        showLocationNotification(`Ошибка обновления: ${error.message}`, "error")
+        return false
+    }
+}
+
+function startEditingNotes(shopId) {
+    const editContainer = document.querySelector(`[data-shop-id="${shopId}"] .notes-edit-container`)
+    if (!editContainer) return
+
+    const displayDiv = editContainer.querySelector(".notes-display")
+    const editForm = editContainer.querySelector(".notes-edit-form")
+    const textarea = editContainer.querySelector(".notes-textarea")
+    const shop = allShops.find((s) => s.id === shopId)
+
+    if (!shop) return
+
+    // Показать форму редактирования
+    displayDiv.style.display = "none"
+    editForm.classList.add("active")
+
+    // Заполнить текущими заметками
+    textarea.value = shop.notes || ""
+    textarea.focus()
+
+    // Установить курсор в конец
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+}
+
+function cancelEditingNotes(shopId) {
+    const editContainer = document.querySelector(`[data-shop-id="${shopId}"] .notes-edit-container`)
+    if (!editContainer) return
+
+    const displayDiv = editContainer.querySelector(".notes-display")
+    const editForm = editContainer.querySelector(".notes-edit-form")
+
+    // Скрыть форму редактирования
+    editForm.classList.remove("active")
+    displayDiv.style.display = "flex"
+}
+
+async function saveNotesEdit(shopId) {
+    const editContainer = document.querySelector(`[data-shop-id="${shopId}"] .notes-edit-container`)
+    if (!editContainer) return
+
+    const textarea = editContainer.querySelector(".notes-textarea")
+    const saveBtn = editContainer.querySelector(".notes-save-btn")
+    const editForm = editContainer.querySelector(".notes-edit-form")
+    const displayDiv = editContainer.querySelector(".notes-display")
+
+    const newNotes = textarea.value.trim()
+
+    // Показать состояние загрузки
+    editContainer.classList.add("notes-saving")
+    saveBtn.disabled = true
+    saveBtn.textContent = "Сохранение..."
+
+    const success = await updateShopNotes(shopId, newNotes)
+
+    // Убрать состояние загрузки
+    editContainer.classList.remove("notes-saving")
+    saveBtn.disabled = false
+    saveBtn.textContent = "Сохранить"
+
+    if (success) {
+        // Скрыть форму редактирования
+        editForm.classList.remove("active")
+        displayDiv.style.display = "flex"
+
+        // Обновить отображаемый текст
+        const notesText = editContainer.querySelector(".notes-text")
+        notesText.textContent = newNotes || "Нет заметок"
+    }
+}
+
 // Загрузка данных магазинов с автоматическими обновлениями (оптимизированная)
 async function loadShopData(showNotification = false) {
     try {
@@ -691,11 +804,49 @@ function updateMap() {
                   </div>
                   <div class="detail-content">
                     <span class="detail-label">Заметки</span>
-                    <span class="detail-value">${shop.notes}</span>
+                    <div class="notes-edit-container" data-shop-id="${shop.id}">
+                      <div class="notes-display">
+                        <span class="detail-value notes-text">${shop.notes}</span>
+                        <button class="edit-notes-btn" onclick="startEditingNotes('${shop.id}')" title="Редактировать заметки">
+                          ✏️
+                        </button>
+                      </div>
+                      <div class="notes-edit-form">
+                        <textarea class="notes-textarea" placeholder="Введите заметки...">${shop.notes}</textarea>
+                        <div class="notes-edit-actions">
+                          <button class="notes-save-btn" onclick="saveNotesEdit('${shop.id}')">Сохранить</button>
+                          <button class="notes-cancel-btn" onclick="cancelEditingNotes('${shop.id}')">Отмена</button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               `
-                        : ""
+                        : `
+                <div class="detail-row">
+                  <div class="detail-icon-wrapper notes">
+                    <span class="detail-icon">📝</span>
+                  </div>
+                  <div class="detail-content">
+                    <span class="detail-label">Заметки</span>
+                    <div class="notes-edit-container" data-shop-id="${shop.id}">
+                      <div class="notes-display">
+                        <span class="detail-value notes-text">Нет заметок</span>
+                        <button class="edit-notes-btn" onclick="startEditingNotes('${shop.id}')" title="Добавить заметки">
+                          ✏️
+                        </button>
+                      </div>
+                      <div class="notes-edit-form">
+                        <textarea class="notes-textarea" placeholder="Введите заметки..."></textarea>
+                        <div class="notes-edit-actions">
+                          <button class="notes-save-btn" onclick="saveNotesEdit('${shop.id}')">Сохранить</button>
+                          <button class="notes-cancel-btn" onclick="cancelEditingNotes('${shop.id}')">Отмена</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              `
                     }
               <a href="${yandexGoUrl}" target="_blank" class="route-button">
                 🚗 Построить маршрут
@@ -892,7 +1043,7 @@ function createShopCard(shop) {
     }
 
     return `
-    <div class="shop-card">
+    <div class="shop-card" data-shop-id="${shop.id}">
       <div class="shop-header">
         <h3 class="shop-name">${shop.name}</h3>
         <span class="status-badge ${shop.status}">${getStatusText(shop.status)}</span>
@@ -949,17 +1100,21 @@ function createShopCard(shop) {
         <div class="detail-row">
           <div class="detail-icon notes">📝</div>
           <div class="detail-content">
-            <div class="detail-label">Описание</div>
-            <div class="detail-value description-text">
-              ${description}
-              ${needsExpansion
-            ? `
-                  <button class="expand-btn" onclick="toggleDescription('${shop.id}')">
-                    ${isExpanded ? "Показать меньше" : "Показать больше"}
-                  </button>
-                `
-            : ""
-        }
+            <div class="detail-label">Заметки</div>
+            <div class="notes-edit-container" data-shop-id="${shop.id}">
+              <div class="notes-display">
+                <div class="detail-value notes-text">${shop.notes || "Нет заметок"}</div>
+                <button class="edit-notes-btn" onclick="startEditingNotes('${shop.id}')" title="Редактировать заметки">
+                  ✏️
+                </button>
+              </div>
+              <div class="notes-edit-form">
+                <textarea class="notes-textarea" placeholder="Введите заметки...">${shop.notes || ""}</textarea>
+                <div class="notes-edit-actions">
+                  <button class="notes-save-btn" onclick="saveNotesEdit('${shop.id}')">Сохранить</button>
+                  <button class="notes-cancel-btn" onclick="cancelEditingNotes('${shop.id}')">Отмена</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -971,16 +1126,6 @@ function createShopCard(shop) {
             <div class="detail-value">${formatDateRussian(shop.createdAt)}</div>
           </div>
         </div>
-        
-        ${shop.notes && shop.notes !== shop.description
-            ? `
-            <div class="notes-section">
-              <div class="detail-label">Заметки</div>
-              <div class="detail-value description-text">${shop.notes}</div>
-            </div>
-          `
-            : ""
-        }
       </div>
       
       <button class="view-details-btn" onclick="viewShopDetails('${shop.id}')">
