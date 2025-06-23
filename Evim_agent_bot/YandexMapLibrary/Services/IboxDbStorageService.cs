@@ -175,19 +175,27 @@ public class MarketSyncService
                 var raw = reader.IsDBNull(0) ? null : reader.GetString(0)?.Replace(",", ".").Trim();
                 if (string.IsNullOrWhiteSpace(raw))
                 {
-                    Console.WriteLine("   ⚠️ Skipping empty total value.");
+                    Console.WriteLine($"   ⚠️ Skipping empty total value at record #{recordCount}");
                     continue;
                 }
 
                 if (decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var amount))
                 {
-                    decimal usdAmount = amount > 100 ? Math.Round(amount / _exchangeRate, 2) : amount;
+                    // Smarter detection:
+                    // Consider UZS if raw contains thousands separator OR value is very high
+                    bool isLikelyUzs = raw.Contains(",") || amount >= 1000;
+
+                    decimal usdAmount = isLikelyUzs
+                        ? Math.Round(amount / _exchangeRate, 2)
+                        : amount;
+
                     totalUsd += usdAmount;
-                    Console.WriteLine($"   Sale record #{recordCount}: {raw} => ${usdAmount}");
+
+                    Console.WriteLine($"   ✅ Record #{recordCount}: Raw = \"{raw}\" => {(isLikelyUzs ? "UZS" : "USD")} => ${usdAmount}");
                 }
                 else
                 {
-                    Console.WriteLine($"   ⚠️ Invalid number format in record #{recordCount}: {raw}");
+                    Console.WriteLine($"   ⚠️ Could not parse total value in record #{recordCount}: \"{raw}\"");
                 }
             }
 
@@ -200,5 +208,4 @@ public class MarketSyncService
             return 0;
         }
     }
-
 }
