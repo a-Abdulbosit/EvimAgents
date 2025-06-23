@@ -159,42 +159,46 @@ public class MarketSyncService
             using var conn = new NpgsqlConnection(_iboxDbConnection);
             await conn.OpenAsync();
 
-            var sql = "SELECT total FROM sales_detailed WHERE outlet_id = @outlet_id";
-
+            const string sql = "SELECT total FROM sales_detailed WHERE outlet_id = @outlet_id";
             using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("outlet_id", clientId);
 
             using var reader = await cmd.ExecuteReaderAsync();
 
-            decimal total = 0;
+            decimal totalUsd = 0;
             int recordCount = 0;
 
             while (await reader.ReadAsync())
             {
                 recordCount++;
-                var raw = reader.GetString(0).Replace(",", ".").Trim();
+
+                var raw = reader.IsDBNull(0) ? null : reader.GetString(0)?.Replace(",", ".").Trim();
+                if (string.IsNullOrWhiteSpace(raw))
+                {
+                    Console.WriteLine("   ⚠️ Skipping empty total value.");
+                    continue;
+                }
 
                 if (decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var amount))
                 {
-                    // If amount is greater than 100, assume it's in UZS and convert to USD
-                    var usdAmount = amount > 100 ? Math.Round(amount / _exchangeRate, 2) : amount;
-                    total += usdAmount;
-
-                    Console.WriteLine($"   Sale record: {raw} -> ${usdAmount}");
+                    decimal usdAmount = amount > 100 ? Math.Round(amount / _exchangeRate, 2) : amount;
+                    totalUsd += usdAmount;
+                    Console.WriteLine($"   Sale record #{recordCount}: {raw} => ${usdAmount}");
                 }
                 else
                 {
-                    Console.WriteLine($"   ⚠️ Could not parse price: {raw}");
+                    Console.WriteLine($"   ⚠️ Invalid number format in record #{recordCount}: {raw}");
                 }
             }
 
-            Console.WriteLine($"   📊 Total from {recordCount} sales records: ${Math.Round(total, 2)}");
-            return Math.Round(total, 2);
+            Console.WriteLine($"   📊 Final USD Total from {recordCount} records: ${Math.Round(totalUsd, 2)}");
+            return Math.Round(totalUsd, 2);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ Error getting sales total for client {clientId}: {ex.Message}");
+            Console.WriteLine($"❌ Error retrieving sales for client {clientId}: {ex.Message}");
             return 0;
         }
     }
+
 }
