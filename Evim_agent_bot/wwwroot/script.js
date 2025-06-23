@@ -517,7 +517,192 @@ async function saveNotesEdit(shopId) {
         // Обновить отображаемый текст
         const notesText = editContainer.querySelector(".notes-text")
         notesText.textContent = newNotes || "Нет заметок"
+
+        // Update balloon content if it's open
+        updateBalloonContent(shopId)
     }
+}
+
+// Update balloon content after notes edit
+function updateBalloonContent(shopId) {
+    const shop = allShops.find((s) => s.id === shopId)
+    if (!shop) return
+
+    // Find the placemark for this shop and update its balloon content
+    placemarks.forEach((placemark) => {
+        const coords = placemark.geometry.getCoordinates()
+        if (Math.abs(coords[0] - shop.latitude) < 0.001 && Math.abs(coords[1] - shop.longitude) < 0.001) {
+            // Check if this placemark's balloon is currently open
+            if (placemark.balloon.isOpen()) {
+                // Close and reopen to refresh content
+                placemark.balloon.close()
+                setTimeout(() => {
+                    // Regenerate the balloon content
+                    const group = [shop] // Single shop for this case
+                    const storeCardsHtml = group
+                        .map((s) => {
+                            const statusInfo = getStatusInfo(s.originalStatus)
+                            const yandexGoUrl = `https://3.redirect.appmetrica.yandex.com/route?end-lat=${s.latitude}&end-lon=${s.longitude}&appmetrica_tracking_id=1178268795219780156`
+
+                            let distanceText = ""
+                            if (userLocation) {
+                                const distance = getDistance(userLocation.latitude, userLocation.longitude, s.latitude, s.longitude)
+                                if (distance < 1000) {
+                                    distanceText = `<div style="font-size: 11px; color: #059669; margin-top: 4px;">📍 ${Math.round(distance)} м от вас</div>`
+                                } else {
+                                    distanceText = `<div style="font-size: 11px; color: #3b82f6; margin-top: 4px;">📍 ${(distance / 1000).toFixed(1)} км от вас</div>`
+                                }
+                            }
+
+                            return `
+              <div class="store-card">
+                <div class="store-header">
+                  <div class="store-name">${s.name}</div>
+                </div>
+                <div class="store-details">
+                  <div class="detail-row">
+                    <div class="detail-icon-wrapper agent">
+                      <span class="detail-icon">👤</span>
+                    </div>
+                    <div class="detail-content">
+                      <span class="detail-label">Агент</span>
+                      <span class="detail-value">${s.agent}</span>
+                    </div>
+                  </div>
+                  <div class="detail-row">
+                    <div class="detail-icon-wrapper phone">
+                      <span class="detail-icon">📞</span>
+                    </div>
+                    <div class="detail-content">
+                      <span class="detail-label">Телефон</span>
+                      <span class="detail-value">
+                        <a href="tel:${s.phone}" style="color: #2563eb; text-decoration: none;">
+                          ${s.phone}
+                        </a>
+                      </span>
+                    </div>
+                  </div>
+                  ${s.clientId
+                                    ? `
+                  <div class="detail-row">
+                    <div class="detail-icon-wrapper client">
+                      <span class="detail-icon">🆔</span>
+                    </div>
+                    <div class="detail-content">
+                      <span class="detail-label">ID Клиента</span>
+                      <span class="detail-value">${s.clientId}</span>
+                    </div>
+                  </div>
+                  `
+                                    : ""
+                                }
+                  <div class="detail-row">
+                    <div class="detail-icon-wrapper money">
+                      <span class="detail-icon">💰</span>
+                    </div>
+                    <div class="detail-content">
+                      <span class="detail-label">Общая сумма</span>
+                      <span class="detail-value">$${s.totalUsd.toFixed(2)}</span>
+                    </div>
+                  </div>
+                  <div class="detail-row">
+                    <div class="detail-icon-wrapper date">
+                      <span class="detail-icon">📅</span>
+                    </div>
+                    <div class="detail-content">
+                      <span class="detail-label">Добавлено</span>
+                      <span class="detail-value">${formatDateRussian(s.createdAt)}${distanceText}</span>
+                    </div>
+                  </div>
+                  <div class="detail-row">
+                    <div class="detail-icon-wrapper status">
+                      <span class="detail-icon">${statusInfo.icon}</span>
+                    </div>
+                    <div class="detail-content">
+                      <span class="detail-label">Статус</span>
+                      <span class="detail-value">
+                        <span class="status-badge ${statusInfo.class}">${statusInfo.text}</span>
+                      </span>
+                    </div>
+                  </div>
+                  ${s.notes
+                                    ? `
+                  <div class="detail-row">
+                    <div class="detail-icon-wrapper notes">
+                      <span class="detail-icon">📝</span>
+                    </div>
+                    <div class="detail-content">
+                      <span class="detail-label">Заметки</span>
+                      <div class="notes-edit-container" data-shop-id="${s.id}">
+                        <div class="notes-display">
+                          <span class="detail-value notes-text">${s.notes}</span>
+                          <button class="edit-notes-btn" onclick="startEditingNotes('${s.id}')" title="Редактировать заметки">
+                            ✏️
+                          </button>
+                        </div>
+                        <div class="notes-edit-form">
+                          <textarea class="notes-textarea" placeholder="Введите заметки...">${s.notes}</textarea>
+                          <div class="notes-edit-actions">
+                            <button class="notes-save-btn" onclick="saveNotesEdit('${s.id}')">Сохранить</button>
+                            <button class="notes-cancel-btn" onclick="cancelEditingNotes('${s.id}')">Отмена</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  `
+                                    : `
+                  <div class="detail-row">
+                    <div class="detail-icon-wrapper notes">
+                      <span class="detail-icon">📝</span>
+                    </div>
+                    <div class="detail-content">
+                      <span class="detail-label">Заметки</span>
+                      <div class="notes-edit-container" data-shop-id="${s.id}">
+                        <div class="notes-display">
+                          <span class="detail-value notes-text">Нет заметок</span>
+                          <button class="edit-notes-btn" onclick="startEditingNotes('${s.id}')" title="Добавить заметки">
+                            ✏️
+                          </button>
+                        </div>
+                        <div class="notes-edit-form">
+                          <textarea class="notes-textarea" placeholder="Введите заметки..."></textarea>
+                          <div class="notes-edit-actions">
+                            <button class="notes-save-btn" onclick="saveNotesEdit('${s.id}')">Сохранить</button>
+                            <button class="notes-cancel-btn" onclick="cancelEditingNotes('${s.id}')">Отмена</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  `
+                                }
+                  <a href="${yandexGoUrl}" target="_blank" class="route-button">
+                    🚗 Построить маршрут
+                  </a>
+                </div>
+              </div>
+            `
+                        })
+                        .join("")
+
+                    const content = `
+            <div class="modern-balloon">
+              <div class="balloon-header">
+                <h3 class="balloon-main-title">Партнерский магазин</h3>
+              </div>
+              <div class="balloon-content">
+                ${storeCardsHtml}
+              </div>
+            </div>
+          `
+
+                    placemark.properties.set("balloonContent", content)
+                    placemark.balloon.open()
+                }, 100)
+            }
+        }
+    })
 }
 
 // Загрузка данных магазинов с автоматическими обновлениями (оптимизированная)
@@ -798,55 +983,55 @@ function updateMap() {
               </div>
               ${shop.notes
                         ? `
-                <div class="detail-row">
-                  <div class="detail-icon-wrapper notes">
-                    <span class="detail-icon">📝</span>
-                  </div>
-                  <div class="detail-content">
-                    <span class="detail-label">Заметки</span>
-                    <div class="notes-edit-container" data-shop-id="${shop.id}">
-                      <div class="notes-display">
-                        <span class="detail-value notes-text">${shop.notes}</span>
-                        <button class="edit-notes-btn" onclick="startEditingNotes('${shop.id}')" title="Редактировать заметки">
-                          l✏️l
-                        </button>
-                      </div>
-                      <div class="notes-edit-form">
-                        <textarea class="notes-textarea" placeholder="Введите заметки...">${shop.notes}</textarea>
-                        <div class="notes-edit-actions">
-                          <button class="notes-save-btn" onclick="saveNotesEdit('${shop.id}')">Сохранить</button>
-                          <button class="notes-cancel-btn" onclick="cancelEditingNotes('${shop.id}')">Отмена</button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              `
+    <div class="detail-row">
+      <div class="detail-icon-wrapper notes">
+        <span class="detail-icon">📝</span>
+      </div>
+      <div class="detail-content">
+        <span class="detail-label">Заметки</span>
+        <div class="notes-edit-container" data-shop-id="${shop.id}">
+          <div class="notes-display">
+            <span class="detail-value notes-text">${shop.notes}</span>
+            <button class="edit-notes-btn" onclick="startEditingNotes('${shop.id}')" title="Редактировать заметки">
+              ✏️
+            </button>
+          </div>
+          <div class="notes-edit-form">
+            <textarea class="notes-textarea" placeholder="Введите заметки...">${shop.notes}</textarea>
+            <div class="notes-edit-actions">
+              <button class="notes-save-btn" onclick="saveNotesEdit('${shop.id}')">Сохранить</button>
+              <button class="notes-cancel-btn" onclick="cancelEditingNotes('${shop.id}')">Отмена</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    `
                         : `
-                <div class="detail-row">
-                  <div class="detail-icon-wrapper notes">
-                    <span class="detail-icon">📝</span>
-                  </div>
-                  <div class="detail-content">
-                    <span class="detail-label">Заметки</span>
-                    <div class="notes-edit-container" data-shop-id="${shop.id}">
-                      <div class="notes-display">
-                        <span class="detail-value notes-text">Нет заметок</span>
-                        //<button class="edit-notes-btn" onclick="startEditingNotes('${shop.id}')" title="Добавить заметки">
-                        //  ✏️
-                        //</button>
-                      </div>
-                      <div class="notes-edit-form">
-                        <textarea class="notes-textarea" placeholder="Введите заметки..."></textarea>
-                        <div class="notes-edit-actions">
-                          <button class="notes-save-btn" onclick="saveNotesEdit('${shop.id}')">Сохранить</button>
-                          <button class="notes-cancel-btn" onclick="cancelEditingNotes('${shop.id}')">Отмена</button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              `
+    <div class="detail-row">
+      <div class="detail-icon-wrapper notes">
+        <span class="detail-icon">📝</span>
+      </div>
+      <div class="detail-content">
+        <span class="detail-label">Заметки</span>
+        <div class="notes-edit-container" data-shop-id="${shop.id}">
+          <div class="notes-display">
+            <span class="detail-value notes-text">Нет заметок</span>
+            <button class="edit-notes-btn" onclick="startEditingNotes('${shop.id}')" title="Добавить заметки">
+              ✏️
+            </button>
+          </div>
+          <div class="notes-edit-form">
+            <textarea class="notes-textarea" placeholder="Введите заметки..."></textarea>
+            <div class="notes-edit-actions">
+              <button class="notes-save-btn" onclick="saveNotesEdit('${shop.id}')">Сохранить</button>
+              <button class="notes-cancel-btn" onclick="cancelEditingNotes('${shop.id}')">Отмена</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    `
                     }
               <a href="${yandexGoUrl}" target="_blank" class="route-button">
                 🚗 Построить маршрут
