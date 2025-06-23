@@ -10,7 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING") 
     ?? "Host=dpg-d19s7015pdvs73a52p50-a;Port=5432;Database=evim_db;Username=evim_db_user;Password=zs6QbkYpzIV7OJsK5hAfDmCHeINezK3a;SSL Mode=Require;Trust Server Certificate=true";
 
-var iboxConnectionString = "Host=airnet;Port=5432;Database=evim_db;Username=friday;Password=3331";
+var iboxConnectionString = "Host=95.182.117.158;Port=5432;Database=evim_db;Username=postgres;Password=9554";
 
 var app = builder.Build();
 
