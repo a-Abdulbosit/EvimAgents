@@ -2,6 +2,7 @@
 using Evim_agent_bot.YandexMapLibrary.Models;
 
 namespace Evim_agent_bot.YandexMapLibrary.Services;
+
 public class DbStorageService
 {
     private readonly string _connectionString;
@@ -13,10 +14,10 @@ public class DbStorageService
 
     public DbStorageService()
     {
-
-        _connectionString = Environment.GetEnvironmentVariable("Host=dpg-d19s7015pdvs73a52p50-a;Port=5432;Database=evim_db;Username=evim_db_user;Password=zs6QbkYpzIV7OJsK5hAfDmCHeINezK3a;SSL Mode=Require;Tru_\r\n")
-            ?? throw new Exception("DB_CONNECTION_STRING is not set.");
+        _connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING")
+            ?? "Host=dpg-d19s7015pdvs73a52p50-a;Port=5432;Database=evim_db;Username=evim_db_user;Password=zs6QbkYpzIV7OJsK5hAfDmCHeINezK3a;SSL Mode=Require;Trust Server Certificate=true";
     }
+
     public async Task<List<MarketLocation>> GetAllLocationsAsync()
     {
         var list = new List<MarketLocation>();
@@ -41,7 +42,9 @@ public class DbStorageService
                 Latitude = reader.GetDouble(reader.GetOrdinal("latitude")),
                 Longitude = reader.GetDouble(reader.GetOrdinal("longitude")),
                 CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
-                Status = (PartnerStatus)reader.GetInt32(reader.GetOrdinal("status"))
+                Status = (PartnerStatus)reader.GetInt32(reader.GetOrdinal("status")),
+                ClientId = reader.IsDBNull(reader.GetOrdinal("client_id")) ? null : reader.GetInt64(reader.GetOrdinal("client_id")),
+                TotalUsd = reader.IsDBNull(reader.GetOrdinal("total_usd")) ? null : reader.GetDecimal(reader.GetOrdinal("total_usd"))
             });
         }
 
@@ -52,14 +55,14 @@ public class DbStorageService
     {
         using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync();
-        
+
         var sql = @"
             INSERT INTO market_locations (
                 telegram_user_id, agent_name, market_number, market_name,
-                notes, latitude, longitude, created_at, status
+                notes, latitude, longitude, created_at, status, client_id, total_usd
             ) VALUES (
                 @telegram_user_id, @agent_name, @market_number, @market_name,
-                @notes, @latitude, @longitude, @created_at, @status
+                @notes, @latitude, @longitude, @created_at, @status, @client_id, @total_usd
             )";
 
         using var cmd = new NpgsqlCommand(sql, conn);
@@ -72,6 +75,8 @@ public class DbStorageService
         cmd.Parameters.AddWithValue("longitude", loc.Longitude);
         cmd.Parameters.AddWithValue("created_at", loc.CreatedAt);
         cmd.Parameters.AddWithValue("status", (int)loc.Status);
+        cmd.Parameters.AddWithValue("client_id", (object?)loc.ClientId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("total_usd", (object?)loc.TotalUsd ?? DBNull.Value);
 
         await cmd.ExecuteNonQueryAsync();
     }

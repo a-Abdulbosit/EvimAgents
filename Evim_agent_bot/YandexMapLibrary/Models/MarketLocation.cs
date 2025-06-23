@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Evim_agent_bot.YandexMapLibrary.Models
 {
@@ -12,6 +8,7 @@ namespace Evim_agent_bot.YandexMapLibrary.Models
         Active = 1,
         NotActive = 2
     }
+
     public class MarketLocation
     {
         public long TelegramUserId { get; set; }
@@ -28,7 +25,5 @@ namespace Evim_agent_bot.YandexMapLibrary.Models
         public PartnerStatus Status { get; set; } = PartnerStatus.New;
         public long? ClientId { get; set; }
         public decimal? TotalUsd { get; set; }
-
-
     }
 }

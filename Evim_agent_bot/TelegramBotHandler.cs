@@ -37,122 +37,135 @@ public class TelegramBotHandler
 
     private async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, CancellationToken ct)
     {
-        if (update.Type == UpdateType.CallbackQuery)
+        try
         {
-            await HandleCallbackQuery(bot, update.CallbackQuery!);
-            return;
-        }
-
-        if (update.Type != UpdateType.Message || update.Message == null)
-            return;
-
-        var msg = update.Message;
-        var chatId = msg.Chat.Id;
-        var userId = msg.From.Id;
-
-        if (msg.Location != null)
-        {
-            var location = new MarketLocation
+            if (update.Type == UpdateType.CallbackQuery)
             {
-                TelegramUserId = userId,
-                AgentName = $"{msg.From.FirstName} {msg.From.LastName}".Trim(),
-                Latitude = msg.Location.Latitude,
-                Longitude = msg.Location.Longitude,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _pendingLocations[userId] = (location, 1);
-            await bot.SendTextMessageAsync(chatId, "📍 Локация получена!\nТеперь введите *название магазина*.");
-            return;
-        }
-
-        if (_pendingLocations.TryGetValue(userId, out var session) && !string.IsNullOrWhiteSpace(msg.Text))
-        {
-            var (location, step) = session;
-            string text = msg.Text.Trim();
-
-            switch (step)
-            {
-                case 1:
-                    location.MarketName = text;
-                    _pendingLocations[userId] = (location, 2);
-                    await bot.SendTextMessageAsync(chatId, "🔢 Введите *номер магазина*.");
-                    break;
-
-                case 2:
-                    location.MarketNumber = text;
-                    _pendingLocations[userId] = (location, 3);
-                    await bot.SendTextMessageAsync(chatId, "📝 Есть ли *заметки*? Если нет — введите 'нет'.");
-                    break;
-
-                case 3:
-                    location.Notes = text.ToLower() == "нет" ? null : text;
-                    _pendingLocations[userId] = (location, 4);
-
-                    var buttons = new InlineKeyboardMarkup(new[]
-                    {
-                        new[]
-                        {
-                            InlineKeyboardButton.WithCallbackData("🕓 Новый", "status_0"),
-                            InlineKeyboardButton.WithCallbackData("✅ Активный", "status_1"),
-                            InlineKeyboardButton.WithCallbackData("❌ Неактивный", "status_2")
-                        }
-                    });
-
-                    await bot.SendTextMessageAsync(chatId, "📌 Выберите *статус* партнёра:", replyMarkup: buttons);
-                    break;
+                await HandleCallbackQuery(bot, update.CallbackQuery!);
+                return;
             }
 
-            return;
-        }
+            if (update.Type != UpdateType.Message || update.Message == null)
+                return;
 
-        if (msg.Text == "/start")
+            var msg = update.Message;
+            var chatId = msg.Chat.Id;
+            var userId = msg.From?.Id ?? 0;
+
+            if (msg.Location != null)
+            {
+                var location = new MarketLocation
+                {
+                    TelegramUserId = userId,
+                    AgentName = $"{msg.From?.FirstName} {msg.From?.LastName}".Trim(),
+                    Latitude = msg.Location.Latitude,
+                    Longitude = msg.Location.Longitude,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _pendingLocations[userId] = (location, 1);
+                await bot.SendTextMessageAsync(chatId, "📍 Локация получена!\nТеперь введите *название магазина*.", parseMode: ParseMode.Markdown);
+                return;
+            }
+
+            if (_pendingLocations.TryGetValue(userId, out var session) && !string.IsNullOrWhiteSpace(msg.Text))
+            {
+                var (location, step) = session;
+                string text = msg.Text.Trim();
+
+                switch (step)
+                {
+                    case 1:
+                        location.MarketName = text;
+                        _pendingLocations[userId] = (location, 2);
+                        await bot.SendTextMessageAsync(chatId, "🔢 Введите *номер магазина*.", parseMode: ParseMode.Markdown);
+                        break;
+
+                    case 2:
+                        location.MarketNumber = text;
+                        _pendingLocations[userId] = (location, 3);
+                        await bot.SendTextMessageAsync(chatId, "📝 Есть ли *заметки*? Если нет — введите 'нет'.", parseMode: ParseMode.Markdown);
+                        break;
+
+                    case 3:
+                        location.Notes = text.ToLower() == "нет" ? null : text;
+                        _pendingLocations[userId] = (location, 4);
+
+                        var buttons = new InlineKeyboardMarkup(new[]
+                        {
+                            new[]
+                            {
+                                InlineKeyboardButton.WithCallbackData("🕓 Новый", "status_0"),
+                                InlineKeyboardButton.WithCallbackData("✅ Активный", "status_1"),
+                                InlineKeyboardButton.WithCallbackData("❌ Неактивный", "status_2")
+                            }
+                        });
+
+                        await bot.SendTextMessageAsync(chatId, "📌 Выберите *статус* партнёра:", replyMarkup: buttons, parseMode: ParseMode.Markdown);
+                        break;
+                }
+
+                return;
+            }
+
+            if (msg.Text == "/start")
+            {
+                await bot.SendTextMessageAsync(chatId, "👋 Добро пожаловать!\nПожалуйста, отправьте свою *локацию*, чтобы начать метку магазина.", parseMode: ParseMode.Markdown);
+            }
+        }
+        catch (Exception ex)
         {
-            await bot.SendTextMessageAsync(chatId, "👋 Добро пожаловать!\nПожалуйста, отправьте свою *локацию*, чтобы начать метку магазина.");
+            Console.WriteLine($"❌ Error in HandleUpdateAsync: {ex.Message}");
         }
     }
 
     private async Task HandleCallbackQuery(ITelegramBotClient bot, CallbackQuery query)
     {
-        var chatId = query.Message?.Chat.Id ?? query.From.Id;
-        var userId = query.From.Id;
-
-        if (!_pendingLocations.TryGetValue(userId, out var session))
-            return;
-        if (query.Data != null && query.Data.StartsWith("status_"))
+        try
         {
-            var statusNum = int.Parse(query.Data.Replace("status_", ""));
-            session.Location.Status = (PartnerStatus)statusNum;
+            var chatId = query.Message?.Chat.Id ?? query.From.Id;
+            var userId = query.From.Id;
 
-            _pendingLocations.Remove(userId);
-
-            Console.WriteLine("Saving location: " + System.Text.Json.JsonSerializer.Serialize(session.Location));
-
-            try
-            {
-                await _dbStorage.SaveLocationAsync(session.Location);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("❌ DB Save Error: " + ex.Message);
-                Console.WriteLine(ex.StackTrace);
-                await bot.SendTextMessageAsync(chatId, "❌ Xatolik: saqlashda muammo yuz berdi.");
+            if (!_pendingLocations.TryGetValue(userId, out var session))
                 return;
+
+            if (query.Data != null && query.Data.StartsWith("status_"))
+            {
+                var statusNum = int.Parse(query.Data.Replace("status_", ""));
+                session.Location.Status = (PartnerStatus)statusNum;
+
+                _pendingLocations.Remove(userId);
+
+                Console.WriteLine("Saving location: " + System.Text.Json.JsonSerializer.Serialize(session.Location));
+
+                try
+                {
+                    await _dbStorage.SaveLocationAsync(session.Location);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("❌ DB Save Error: " + ex.Message);
+                    Console.WriteLine(ex.StackTrace);
+                    await bot.SendTextMessageAsync(chatId, "❌ Ошибка: проблема при сохранении данных.");
+                    return;
+                }
+
+                await bot.SendTextMessageAsync(chatId,
+                    $"✅ Сохранено:\n🏪 {session.Location.MarketName} #{session.Location.MarketNumber}\n📍 ({session.Location.Latitude}, {session.Location.Longitude})\n🟢 Статус: {(PartnerStatus)statusNum}");
+
+                await bot.SendTextMessageAsync(chatId, "🗺️ Посмотреть на карте: https://evimagents.onrender.com");
+                await bot.AnswerCallbackQueryAsync(query.Id);
             }
-
-            await bot.SendTextMessageAsync(chatId,
-                $"✅ Сохранено:\n🏪 {session.Location.MarketName} #{session.Location.MarketNumber}\n📍 ({session.Location.Latitude}, {session.Location.Longitude})\n🟢 Статус: {(PartnerStatus)statusNum}");
-
-            await bot.SendTextMessageAsync(chatId, "https://evimagents.onrender.com");
-            await bot.AnswerCallbackQueryAsync(query.Id);
         }
-
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error in HandleCallbackQuery: {ex.Message}");
+        }
     }
-
 
     private Task HandleErrorAsync(ITelegramBotClient bot, Exception ex, CancellationToken ct)
     {
-        Console.WriteLine($"❌ Ошибка: {ex.Message}");
+        Console.WriteLine($"❌ Telegram Bot Error: {ex.Message}");
         return Task.CompletedTask;
     }
 }

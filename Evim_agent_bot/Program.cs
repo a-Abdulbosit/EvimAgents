@@ -5,47 +5,49 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.FileProviders;
 using System.Text.Json;
 
-        var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
-        var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING");
-        var iboxConnectionString = "Host=airnet;Port=5432;Database=evim_db;Username=friday;Password=3331";
+var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING")
+    ?? "Host=dpg-d19s7015pdvs73a52p50-a;Port=5432;Database=evim_db;Username=evim_db_user;Password=zs6QbkYpzIV7OJsK5hAfDmCHeINezK3a;SSL Mode=Require;Trust Server Certificate=true";
 
-        var app = builder.Build();
+var iboxConnectionString = "Host=airnet;Port=5432;Database=evim_db;Username=friday;Password=3331";
 
-        // ✅ Serve index.html, styles.css, script.js from wwwroot
-        app.UseDefaultFiles();
-        app.UseStaticFiles(new StaticFileOptions
-        {
-            FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot")),
-            RequestPath = ""
-        });
+var app = builder.Build();
 
-        // ✅ GET endpoint for frontend: returns market locations
-        app.MapGet("/locations.json", async () =>
-        {
-            var db = new DbStorageService(connectionString);
-            var locations = await db.GetAllLocationsAsync();
+// ✅ Serve index.html, styles.css, script.js from wwwroot
+app.UseDefaultFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot")),
+    RequestPath = ""
+});
 
-            return Results.Json(locations, new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            });
-        });
+// ✅ GET endpoint for frontend: returns market locations
+app.MapGet("/locations.json", async () =>
+{
+    var db = new DbStorageService(connectionString);
+    var locations = await db.GetAllLocationsAsync();
 
-        // ✅ POST endpoint for syncing totals from ibox → main DB
-        app.MapPost("/sync", async () =>
-        {
-            var syncService = new MarketSyncService(connectionString, iboxConnectionString);
-            await syncService.SyncTotalsAsync();
-            return Results.Ok("Synced all totals");
-        });
+    return Results.Json(locations, new JsonSerializerOptions
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    });
+});
 
-        // ✅ Start Telegram bot
-        var botToken = Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN")
-                       ?? "7112655258:AAGypb28Fosi0tgoe9LqOiZRY41Rm2fdaVk";
+// ✅ POST endpoint for syncing totals from ibox → main DB
+app.MapPost("/sync", async () =>
+{
+    var syncService = new MarketSyncService(connectionString, iboxConnectionString);
+    await syncService.SyncTotalsAsync();
+    return Results.Ok("Synced all totals");
+});
 
-        var botHandler = new TelegramBotHandler(botToken, connectionString);
-        botHandler.Start();
+// ✅ Start Telegram bot
+var botToken = Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN")
+               ?? "7112655258:AAGypb28Fosi0tgoe9LqOiZRY41Rm2fdaVk";
 
-        // ✅ Start the web app
-        app.Run();
+var botHandler = new TelegramBotHandler(botToken, connectionString);
+botHandler.Start();
+
+// ✅ Start the web app
+app.Run();
