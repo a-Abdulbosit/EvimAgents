@@ -82,7 +82,7 @@ public class TelegramBotHandler
                         break;
 
                     case 2:
-                        location.MarketNumber = text;
+                        location.MarketNumber = "+998" + text;
                         _pendingLocations[userId] = (location, 3);
                         await bot.SendTextMessageAsync(chatId, "📝 Есть ли *заметки*? Если нет — введите 'нет'.", parseMode: ParseMode.Markdown);
                         break;
