@@ -1,0 +1,247 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ панель - Синхронизация</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8fafc;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #1f2937;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+        }
+
+            .section h2 {
+                color: #374151;
+                margin-bottom: 15px;
+            }
+
+        .btn {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            transition: all 0.2s ease;
+        }
+
+            .btn:hover {
+                background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+                transform: translateY(-1px);
+            }
+
+            .btn:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+                transform: none;
+            }
+
+        input[type="text"] {
+            width: 300px;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+            .result.success {
+                background: #dcfce7;
+                border: 1px solid #bbf7d0;
+                color: #166534;
+            }
+
+            .result.error {
+                background: #fee2e2;
+                border: 1px solid #fecaca;
+                color: #991b1b;
+            }
+
+            .result.loading {
+                background: #dbeafe;
+                border: 1px solid #bfdbfe;
+                color: #1e40af;
+            }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Панель синхронизации данных</h1>
+
+        <div class="section">
+            <h2>📊 Полная синхронизация</h2>
+            <p>Синхронизирует все телефоны из базы данных с системой iBox</p>
+            <button class="btn" onclick="fullSync()" id="fullSyncBtn">
+                Запустить полную синхронизацию
+            </button>
+            <div id="fullSyncResult"></div>
+        </div>
+
+        <div class="section">
+            <h2>📱 Тест конкретного телефона</h2>
+            <p>Проверить синхронизацию для определенного номера телефона</p>
+            <input type="text" id="phoneInput" placeholder="+998914078992" value="+998914078992">
+            <button class="btn" onclick="testPhone()" id="testPhoneBtn">
+                Тестировать телефон
+            </button>
+            <div id="testPhoneResult"></div>
+        </div>
+
+        <div class="section">
+            <h2>📋 Просмотр данных</h2>
+            <p>Посмотреть текущие данные локаций</p>
+            <button class="btn" onclick="viewLocations()" id="viewLocationsBtn">
+                Показать все локации
+            </button>
+            <div id="viewLocationsResult"></div>
+        </div>
+    </div>
+
+    <script>
+        async function fullSync() {
+            const btn = document.getElementById('fullSyncBtn');
+            const result = document.getElementById('fullSyncResult');
+
+            btn.disabled = true;
+            btn.textContent = 'Синхронизация...';
+            result.className = 'result loading';
+            result.textContent = 'Выполняется полная синхронизация...\nЭто может занять несколько минут.';
+
+            try {
+                const response = await fetch('/sync', {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    const text = await response.text();
+                    result.className = 'result success';
+                    result.textContent = '✅ Синхронизация завершена успешно!\n\n' + text;
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.textContent = '❌ Ошибка синхронизации:\n\n' + error.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Запустить полную синхронизацию';
+            }
+        }
+
+        async function testPhone() {
+            const btn = document.getElementById('testPhoneBtn');
+            const result = document.getElementById('testPhoneResult');
+            const phone = document.getElementById('phoneInput').value.trim();
+
+            if (!phone) {
+                result.className = 'result error';
+                result.textContent = 'Введите номер телефона';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Тестирование...';
+            result.className = 'result loading';
+            result.textContent = `Тестирование телефона: ${phone}...`;
+
+            try {
+                const response = await fetch(`/sync/${encodeURIComponent(phone)}`);
+
+                if (response.ok) {
+                    const text = await response.text();
+                    result.className = 'result success';
+                    result.textContent = '✅ Тест завершен!\n\n' + text;
+                } else if (response.status === 404) {
+                    result.className = 'result error';
+                    result.textContent = `❌ Телефон ${phone} не найден в базе данных`;
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.textContent = '❌ Ошибка тестирования:\n\n' + error.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Тестировать телефон';
+            }
+        }
+
+        async function viewLocations() {
+            const btn = document.getElementById('viewLocationsBtn');
+            const result = document.getElementById('viewLocationsResult');
+
+            btn.disabled = true;
+            btn.textContent = 'Загружается...';
+            result.className = 'result loading';
+            result.textContent = 'Загрузка данных локаций...';
+
+            try {
+                const response = await fetch('/locations.json');
+
+                if (response.ok) {
+                    const locations = await response.json();
+                    result.className = 'result success';
+
+                    let output = `📊 Найдено ${locations.length} локаций:\n\n`;
+                    locations.forEach((loc, index) => {
+                        output += `${index + 1}. ${loc.marketName}\n`;
+                        output += `   📱 Телефон: ${loc.marketNumber}\n`;
+                        output += `   👤 Агент: ${loc.agentName}\n`;
+                        output += `   🆔 Client ID: ${loc.clientId || 'не установлен'}\n`;
+                        output += `   💰 Сумма: $${(loc.totalUsd || 0).toFixed(2)}\n`;
+                        output += `   📅 Статус: ${loc.status === 1 ? 'Активный' : loc.status === 0 ? 'Новый' : 'Неактивный'}\n\n`;
+                    });
+
+                    result.textContent = output;
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.textContent = '❌ Ошибка загрузки данных:\n\n' + error.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Показать все локации';
+            }
+        }
+    </script>
+</body>
+</html>
