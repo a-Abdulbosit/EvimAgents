@@ -808,7 +808,7 @@ function updateMap() {
                       <div class="notes-display">
                         <span class="detail-value notes-text">${shop.notes}</span>
                         <button class="edit-notes-btn" onclick="startEditingNotes('${shop.id}')" title="Редактировать заметки">
-                          ✏️
+                          l✏️l
                         </button>
                       </div>
                       <div class="notes-edit-form">
@@ -832,9 +832,9 @@ function updateMap() {
                     <div class="notes-edit-container" data-shop-id="${shop.id}">
                       <div class="notes-display">
                         <span class="detail-value notes-text">Нет заметок</span>
-                        <button class="edit-notes-btn" onclick="startEditingNotes('${shop.id}')" title="Добавить заметки">
-                          ✏️
-                        </button>
+                        //<button class="edit-notes-btn" onclick="startEditingNotes('${shop.id}')" title="Добавить заметки">
+                        //  ✏️
+                        //</button>
                       </div>
                       <div class="notes-edit-form">
                         <textarea class="notes-textarea" placeholder="Введите заметки..."></textarea>
@@ -1104,9 +1104,9 @@ function createShopCard(shop) {
             <div class="notes-edit-container" data-shop-id="${shop.id}">
               <div class="notes-display">
                 <div class="detail-value notes-text">${shop.notes || "Нет заметок"}</div>
-                //<button class="edit-notes-btn" onclick="startEditingNotes('${shop.id}')" title="Редактировать заметки">
-                //  ✏️
-                //</button>
+                <button class="edit-notes-btn" onclick="startEditingNotes('${shop.id}')" title="Редактировать заметки">
+                  ✏️
+                </button>
               </div>
               <div class="notes-edit-form">
                 <textarea class="notes-textarea" placeholder="Введите заметки...">${shop.notes || ""}</textarea>
