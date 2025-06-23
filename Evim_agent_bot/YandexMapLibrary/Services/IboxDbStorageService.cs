@@ -103,19 +103,19 @@ public class MarketSyncService
 
             foreach (var phoneFormat in phoneFormats.Distinct())
             {
-                // Try contacts column first
+                // Try exact match in contacts
                 var sql = "SELECT id FROM clients WHERE contacts = @phone LIMIT 1";
                 using var cmd = new NpgsqlCommand(sql, conn);
                 cmd.Parameters.AddWithValue("phone", phoneFormat);
 
                 var result = await cmd.ExecuteScalarAsync();
-                if (result is long id)
+                if (result is long id1)
                 {
-                    Console.WriteLine($"✅ Found client ID {id} for phone {phoneFormat} in contacts column");
-                    return id;
+                    Console.WriteLine($"✅ Exact match in contacts: {phoneFormat} => ID {id1}");
+                    return id1;
                 }
 
-                // Try phone_number column
+                // Try exact match in phone_number
                 sql = "SELECT id FROM clients WHERE phone_number = @phone LIMIT 1";
                 cmd.CommandText = sql;
                 cmd.Parameters.Clear();
@@ -124,23 +124,24 @@ public class MarketSyncService
                 result = await cmd.ExecuteScalarAsync();
                 if (result is long id2)
                 {
-                    Console.WriteLine($"✅ Found client ID {id2} for phone {phoneFormat} in phone_number column");
+                    Console.WriteLine($"✅ Exact match in phone_number: {phoneFormat} => ID {id2}");
                     return id2;
                 }
 
-                // Try with LIKE for partial matches
-                sql = "SELECT id FROM clients WHERE contacts LIKE @phone OR phone_number LIKE @phone LIMIT 1";
+                // Try LIKE match (for embedded phone)
+                sql = "SELECT id FROM clients WHERE contacts ILIKE @like OR phone_number ILIKE @like LIMIT 1";
                 cmd.CommandText = sql;
                 cmd.Parameters.Clear();
-                cmd.Parameters.AddWithValue("phone", "%" + phoneFormat + "%");
+                cmd.Parameters.AddWithValue("like", "%" + phoneFormat + "%");
 
                 result = await cmd.ExecuteScalarAsync();
                 if (result is long id3)
                 {
-                    Console.WriteLine($"✅ Found client ID {id3} for phone {phoneFormat} with LIKE search");
+                    Console.WriteLine($"✅ LIKE match: {phoneFormat} => ID {id3}");
                     return id3;
                 }
             }
+
 
             Console.WriteLine($"❌ No client found for phone: {phone} (tried formats: {string.Join(", ", phoneFormats)})");
             return null;
