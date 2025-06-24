@@ -142,7 +142,6 @@ public class MarketSyncService
                 }
             }
 
-
             Console.WriteLine($"❌ No client found for phone: {phone} (tried formats: {string.Join(", ", phoneFormats)})");
             return null;
         }
@@ -159,8 +158,12 @@ public class MarketSyncService
         {
             using var conn = new NpgsqlConnection(_iboxDbConnection);
             await conn.OpenAsync();
+            const string sql = @"
+                SELECT total 
+                FROM sales_detailed 
+                WHERE outlet_id = @outlet_id
+                  AND shipment_date >= CURRENT_DATE - INTERVAL '30 days'";
 
-            const string sql = "SELECT total FROM sales_detailed WHERE outlet_id = @outlet_id";
             using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("outlet_id", clientId);
 
