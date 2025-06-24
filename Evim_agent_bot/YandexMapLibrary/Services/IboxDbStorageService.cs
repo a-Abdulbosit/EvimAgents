@@ -162,7 +162,7 @@ public class MarketSyncService
                 SELECT total 
                 FROM sales_detailed 
                 WHERE outlet_id = @outlet_id
-                  AND shipment_date::date >= CURRENT_DATE - INTERVAL '30 days'";
+                  AND shipment_date::date >= CURRENT_DATE - INTERVAL '60 days'";
 
 
             using var cmd = new NpgsqlCommand(sql, conn);
