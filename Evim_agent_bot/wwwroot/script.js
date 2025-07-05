@@ -874,11 +874,11 @@ function updateMap() {
         const getIconColor = (status) => {
             switch (status) {
                 case 0:
-                    return "#f59e0b" // в ожидании - желтый
+                    return "#6b7280" // в ожидании - желтый
                 case 1:
-                    return "#059669" // активный - зеленый
+                    return "#6b7280" // активный - зеленый
                 case 2:
-                    return "#dc2626" // неактивный - красный
+                    return "#6b7280" // неактивный - красный
                 default:
                     return "#6b7280" // неизвестно - серый
             }
@@ -1031,7 +1031,6 @@ function createShopCard(shop) {
     const description = isExpanded ? shop.description : truncateText(shop.description)
     const needsExpansion = shop.description.length > 120
 
-    // Рассчитать расстояние до пользователя, если местоположение известно
     let distanceText = ""
     if (userLocation) {
         const distance = getDistance(userLocation.latitude, userLocation.longitude, shop.latitude, shop.longitude)
