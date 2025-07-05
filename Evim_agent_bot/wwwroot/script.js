@@ -850,7 +850,7 @@ function updateMap() {
               </a>
               <button class="visited-button" onclick="markVisited(${shop.telegramUserId})">
                     ✅ Отметить как посещённый
-              </button>
+                </button>
             </div>
           </div>
         `
@@ -1127,7 +1127,9 @@ function createShopCard(shop) {
           </div>
         </div>
       </div>
-      
+    <button class="visited-button" onclick="markVisited(${shop.telegramUserId})">
+        ✅ Отметить как посещённый
+    </button>
       <button class="view-details-btn" onclick="viewShopDetails('${shop.id}')">
         Показать на карте
       </button>
