@@ -32,7 +32,6 @@ public class TelegramBotHandler
         );
 
         Console.WriteLine("✅ Бот запущен...");
-        Console.ReadLine();
     }
 
     private async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, CancellationToken ct)
