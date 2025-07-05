@@ -1053,7 +1053,7 @@ function createShopCard(shop) {
         <div class="detail-row">
           <div class="detail-icon address">📍</div>
           <div class="detail-content">
-            <div class="detail-label">Адрес</div>
+            <div class="detail-label">Адрес клиента</div>
             <div class="detail-value">${shop.address}${distanceText}</div>
           </div>
         </div>
