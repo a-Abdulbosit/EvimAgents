@@ -25,5 +25,7 @@ namespace Evim_agent_bot.YandexMapLibrary.Models
         public PartnerStatus Status { get; set; } = PartnerStatus.New;
         public long? ClientId { get; set; }
         public decimal? TotalUsd { get; set; }
+
+        public DateTime? VisitedAt { get; set; }
     }
 }

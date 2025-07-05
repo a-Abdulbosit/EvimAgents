@@ -848,6 +848,9 @@ function updateMap() {
               <a href="${yandexGoUrl}" target="_blank" class="route-button">
                 🚗 Построить маршрут
               </a>
+              <button class="visited-button" onclick="markVisited(${shop.telegramUserId})">
+                    ✅ Отметить как посещённый
+              </button>
             </div>
           </div>
         `
@@ -1227,6 +1230,7 @@ function closePopupOnOverlay(event) {
     }
 }
 
+
 function viewShopDetails(shopId) {
     const shop = allShops.find((s) => s.id === shopId)
     if (shop && map) {
@@ -1236,6 +1240,25 @@ function viewShopDetails(shopId) {
         // Remove the condition that opens panel - we want it closed
     }
 }
+
+async function markVisited(telegramUserId) {
+    try {
+        const res = await fetch(`/mark-visited/${telegramUserId}`, {
+            method: "POST",
+        });
+
+        if (res.ok) {
+            alert("✅ Магазин отмечен как посещённый!");
+            await reloadMap(); 
+        } else {
+            alert("❌ Не удалось отметить посещение.");
+        }
+    } catch (err) {
+        console.error(err);
+        alert("⚠️ Ошибка при запросе к серверу");
+    }
+}
+
 
 // Обработчики событий клавиатуры
 document.addEventListener("keydown", (event) => {

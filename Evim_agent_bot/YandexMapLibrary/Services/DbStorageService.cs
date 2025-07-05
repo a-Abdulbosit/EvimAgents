@@ -17,6 +17,18 @@ public class DbStorageService
         _connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING")
             ?? "Host=dpg-d19s7015pdvs73a52p50-a;Port=5432;Database=evim_db;Username=evim_db_user;Password=zs6QbkYpzIV7OJsK5hAfDmCHeINezK3a;SSL Mode=Require;Trust Server Certificate=true";
     }
+    public async Task MarkAsVisitedAsync(long telegramUserId)
+    {
+        using var conn = new NpgsqlConnection(_connectionString);
+        await conn.OpenAsync();
+
+        var sql = "UPDATE market_locations SET visited_at = @visitedAt WHERE telegram_user_id = @id";
+        using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("visitedAt", DateTime.UtcNow);
+        cmd.Parameters.AddWithValue("id", telegramUserId);
+
+        await cmd.ExecuteNonQueryAsync();
+    }
 
     public async Task<List<MarketLocation>> GetAllLocationsAsync()
     {

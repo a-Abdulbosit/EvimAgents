@@ -34,6 +34,12 @@ app.MapGet("/locations.json", async () =>
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     });
 });
+app.MapPost("/mark-visited/{id:long}", async (long id) =>
+{
+    var db = new DbStorageService(Environment.GetEnvironmentVariable("DB_CONNECTION_STRING"));
+    await db.MarkAsVisitedAsync(id);
+    return Results.Ok();
+});
 
 // ✅ POST endpoint for syncing totals from ibox → main DB
 app.MapPost("/sync", async () =>
@@ -82,7 +88,6 @@ app.MapPost("/update-notes", async (UpdateNotesRequest request) =>
         );
     }
 });
-// ✅ GET endpoint to manually sync a specific phone number for testing
 app.MapGet("/sync/{phone}", async (string phone) =>
 {
     Console.WriteLine($"🔄 Testing sync for phone: {phone}");
