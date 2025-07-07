@@ -848,10 +848,9 @@ function updateMap() {
               <a href="${yandexGoUrl}" target="_blank" class="route-button">
                 🚗 Построить маршрут
               </a>
-              <button class="visited-button" onclick="markVisited(${shop.telegramUserId})">
+              <button class="visited-button" onclick="markVisited(${shop.telegramUserId}, '${shop.marketNumber}')">
                     ✅ Отметить как посещённый
                 </button>
-            </div>
           </div>
         `
             })
@@ -883,8 +882,17 @@ function updateMap() {
                     return "#6b7280" // неизвестно - серый
             }
         }
+        let visitedDate = group[0].visitedAt ? new Date(group[0].visitedAt) : null;
+        let isVisitedRecently = false;
 
-        const iconColor = group.length === 1 ? getIconColor(group[0].originalStatus) : "#3b82f6"
+        if (visitedDate) {
+            const diffInDays = (Date.now() - visitedDate.getTime()) / (1000 * 60 * 60 * 24);
+            isVisitedRecently = diffInDays <= 7;
+        }
+        const iconColor = group.length === 1
+            ? (isVisitedRecently ? "#3b82f6" : "#ef4444") // blue if visited recently, red otherwise
+            : "#3b82f6"; // default group color
+
         const iconSize = group.length > 1 ? [36, 36] : [28, 28]
         const iconOffset = group.length > 1 ? [-18, -36] : [-14, -28]
         const displayText = group.length > 1 ? group.length.toString() : "М"
@@ -1126,12 +1134,13 @@ function createShopCard(shop) {
           </div>
         </div>
       </div>
-    <button class="visited-button" onclick="markVisited(${shop.telegramUserId})">
-        ✅ Отметить как посещённый
-    </button>
       <button class="view-details-btn" onclick="viewShopDetails('${shop.id}')">
         Показать на карте
       </button>
+        <button class="visited-button" onclick="markVisited(${shop.telegramUserId}, '${shop.marketNumber}')">
+            ✅ Отметить как посещённый
+        </button>
+
     </div>
   `
 }
@@ -1242,15 +1251,22 @@ function viewShopDetails(shopId) {
     }
 }
 
-async function markVisited(telegramUserId) {
+async function markVisited(telegramUserId, marketNumber) {
     try {
-        const res = await fetch(`/mark-visited/${telegramUserId}`, {
+        const res = await fetch("/mark-visited", {
             method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                telegramUserId,
+                marketNumber
+            }),
         });
 
         if (res.ok) {
             alert("✅ Магазин отмечен как посещённый!");
-            await reloadMap(); 
+            await reloadMap();
         } else {
             alert("❌ Не удалось отметить посещение.");
         }
@@ -1259,6 +1275,7 @@ async function markVisited(telegramUserId) {
         alert("⚠️ Ошибка при запросе к серверу");
     }
 }
+
 
 
 // Обработчики событий клавиатуры

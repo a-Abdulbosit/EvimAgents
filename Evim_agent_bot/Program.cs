@@ -34,12 +34,13 @@ app.MapGet("/locations.json", async () =>
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     });
 });
-app.MapPost("/mark-visited/{id:long}", async (long id) =>
+app.MapPost("/mark-visited", async (MarkVisitedRequest request) =>
 {
     var db = new DbStorageService(Environment.GetEnvironmentVariable("DB_CONNECTION_STRING"));
-    await db.MarkAsVisitedAsync(id);
+    await db.MarkAsVisitedAsync(request.TelegramUserId, request.MarketNumber);
     return Results.Ok();
 });
+
 
 // ✅ POST endpoint for syncing totals from ibox → main DB
 app.MapPost("/sync", async () =>
@@ -131,3 +132,4 @@ botHandler.Start();
 // ✅ Start the web app
 app.Run();
 public record UpdateNotesRequest(long TelegramUserId, string MarketNumber, string? Notes);
+public record MarkVisitedRequest(long TelegramUserId, string MarketNumber);
