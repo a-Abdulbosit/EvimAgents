@@ -17,15 +17,20 @@ public class DbStorageService
         _connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING")
             ?? "Host=dpg-d19s7015pdvs73a52p50-a;Port=5432;Database=evim_db;Username=evim_db_user;Password=zs6QbkYpzIV7OJsK5hAfDmCHeINezK3a;SSL Mode=Require;Trust Server Certificate=true";
     }
-    public async Task MarkAsVisitedAsync(long telegramUserId)
+    public async Task MarkAsVisitedAsync(long telegramUserId, string marketNumber)
     {
         using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync();
 
-        var sql = "UPDATE market_locations SET visited_at = @visitedAt WHERE telegram_user_id = @id";
+        var sql = @"
+        UPDATE market_locations 
+        SET visited_at = @visitedAt 
+        WHERE telegram_user_id = @telegramUserId AND market_number = @marketNumber";
+
         using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("visitedAt", DateTime.UtcNow);
-        cmd.Parameters.AddWithValue("id", telegramUserId);
+        cmd.Parameters.AddWithValue("telegramUserId", telegramUserId);
+        cmd.Parameters.AddWithValue("marketNumber", marketNumber);
 
         await cmd.ExecuteNonQueryAsync();
     }
@@ -71,11 +76,12 @@ public class DbStorageService
         var sql = @"
             INSERT INTO market_locations (
                 telegram_user_id, agent_name, market_number, market_name,
-                notes, latitude, longitude, created_at, status, client_id, total_usd
+                notes, latitude, longitude, created_at, status, client_id, total_usd, visited_at
             ) VALUES (
                 @telegram_user_id, @agent_name, @market_number, @market_name,
-                @notes, @latitude, @longitude, @created_at, @status, @client_id, @total_usd
+                @notes, @latitude, @longitude, @created_at, @status, @client_id, @total_usd, @visited_at
             )";
+
 
         using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("telegram_user_id", loc.TelegramUserId);
@@ -89,6 +95,7 @@ public class DbStorageService
         cmd.Parameters.AddWithValue("status", (int)loc.Status);
         cmd.Parameters.AddWithValue("client_id", (object?)loc.ClientId ?? DBNull.Value);
         cmd.Parameters.AddWithValue("total_usd", (object?)loc.TotalUsd ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("visited_at", (object?)loc.VisitedAt ?? DBNull.Value);
 
         await cmd.ExecuteNonQueryAsync();
     }
