@@ -34,9 +34,11 @@ app.MapGet("/locations.json", async () =>
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     });
 });
+
+
 app.MapPost("/mark-visited", async (MarkVisitedRequest request) =>
 {
-    var db = new DbStorageService(Environment.GetEnvironmentVariable("DB_CONNECTION_STRING"));
+    var db = new DbStorageService(connectionString);
     await db.MarkAsVisitedAsync(request.TelegramUserId, request.MarketNumber);
     return Results.Ok();
 });
