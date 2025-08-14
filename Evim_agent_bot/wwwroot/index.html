@@ -13,7 +13,6 @@
         <button class="panel-toggle" id="panelToggle" onclick="togglePanel()">
             📊
         </button>
-
         <!-- Выдвижная боковая панель -->
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
@@ -24,15 +23,21 @@
                     <div class="update-dot"></div>
                     <span>Обновление каждую секунду</span>
                 </div>
+                <!-- New: Search Bar Integration in Sidebar -->
+                <div class="sidebar-search-container">
+                    <input type="text" id="sidebarSearchInput" placeholder="Поиск по магазинам..." class="sidebar-search-input">
+                    <div class="sidebar-search-results-list" id="sidebarSearchResultsList">
+                        <!-- Search results will be inserted here -->
+                    </div>
+                </div>
+                <!-- End New: Search Bar Integration -->
             </div>
-
             <div class="sidebar-content">
                 <!-- Состояние загрузки -->
                 <div class="loading-container" id="sidebarLoading">
                     <div class="spinner"></div>
                     <p style="font-size: 0.875rem; color: #6b7280;">Загрузка данных магазинов...</p>
                 </div>
-
                 <!-- Контент -->
                 <div id="sidebarContent" style="display: none;">
                     <div class="status-overview">
@@ -61,29 +66,25 @@
                             </div>
                         </div>
                     </div>
-
                     <div class="shops-list" id="shopsList">
                         <!-- Элементы магазинов будут вставлены здесь -->
                     </div>
-
                     <button class="view-all-btn" onclick="openPopup()">
                         Показать все магазины подробно
                     </button>
                 </div>
             </div>
         </div>
-
         <!-- Контейнер карты -->
         <div class="map-container">
             <div id="map"></div>
+            <!-- Map Search Panel removed from here -->
         </div>
     </div>
-
     <!-- Уведомление об обновлении -->
     <div class="update-notification" id="updateNotification">
         📊 Данные магазинов обновлены!
     </div>
-
     <!-- Всплывающее окно -->
     <div class="popup-overlay" id="popupOverlay" onclick="closePopupOnOverlay(event)">
         <div class="popup-container" onclick="event.stopPropagation()">
@@ -94,16 +95,14 @@
                 </div>
                 <button class="close-btn" onclick="closePopup()">×</button>
             </div>
-
             <div class="popup-content">
                 <div class="shops-grid" id="shopsGrid">
                     <!-- Карточки магазинов будут вставлены здесь -->
                 </div>
             </div>
-
             <div class="pagination" id="pagination" style="display: none;">
                 <div class="pagination-info" id="paginationInfo">
-                     с 1 по 7 из 0 магазинов
+                    с 1 по 6 из 0 магазинов
                 </div>
                 <div class="pagination-controls" id="paginationControls">
                     <!-- Кнопки пагинации будут вставлены здесь -->
@@ -111,6 +110,19 @@
             </div>
         </div>
     </div>
+
+    <!-- Added market photo modal for displaying shop photos -->
+    <!--<div class="photo-modal-overlay" id="photoModalOverlay" onclick="closePhotoModal()">
+        <div class="photo-modal-container" onclick="event.stopPropagation()">
+            <div class="photo-modal-header">
+                <h3 class="photo-modal-title" id="photoModalTitle">Фото магазина</h3>
+                <button class="photo-modal-close" onclick="closePhotoModal()">×git </button>
+            </div>
+            <div class="photo-modal-content">
+                <img id="photoModalImage" src="/placeholder.svg" alt="Фото магазина" class="photo-modal-image">
+            </div>
+        </div>
+    </div>-->
 
     <script src="script.js"></script>
 </body>

@@ -13,7 +13,6 @@ public class MarketSyncService
         _mainDbConnection = mainDbConnection;
         _iboxDbConnection = iboxDbConnection;
     }
-
     public async Task SyncTotalsAsync()
     {
         using var mainConn = new NpgsqlConnection(_mainDbConnection);
@@ -50,6 +49,7 @@ public class MarketSyncService
                 var usdTotal = await GetUsdTotalFromSalesAsync(iboxClientId.Value);
 
                 var updateSql = "UPDATE market_locations SET client_id = @client_id, total_usd = @usd WHERE market_number = @phone";
+                Console.WriteLine((object?)iboxClientId);
 
                 using var updateCmd = new NpgsqlCommand(updateSql, mainConn);
                 updateCmd.Parameters.AddWithValue("client_id", (object?)iboxClientId ?? DBNull.Value);
@@ -104,7 +104,7 @@ public class MarketSyncService
             foreach (var phoneFormat in phoneFormats.Distinct())
             {
                 // Try exact match in contacts
-                var sql = "SELECT id FROM clients WHERE contacts = @phone LIMIT 1";
+                var sql = "SELECT id FROM clients WHERE telegram_phone = @phone LIMIT 1";
                 using var cmd = new NpgsqlCommand(sql, conn);
                 cmd.Parameters.AddWithValue("phone", phoneFormat);
 
@@ -114,9 +114,9 @@ public class MarketSyncService
                     Console.WriteLine($"✅ Exact match in contacts: {phoneFormat} => ID {id1}");
                     return id1;
                 }
-
+                
                 // Try exact match in phone_number
-                sql = "SELECT id FROM clients WHERE phone_number = @phone LIMIT 1";
+                sql = "SELECT id FROM clients WHERE telegram_phone = @phone LIMIT 1";
                 cmd.CommandText = sql;
                 cmd.Parameters.Clear();
                 cmd.Parameters.AddWithValue("phone", phoneFormat);
@@ -129,7 +129,7 @@ public class MarketSyncService
                 }
 
                 // Try LIKE match (for embedded phone)
-                sql = "SELECT id FROM clients WHERE contacts ILIKE @like OR phone_number ILIKE @like LIMIT 1";
+                sql = "SELECT id FROM clients WHERE telegram_phone ILIKE @like OR telegram_phone ILIKE @like LIMIT 1";
                 cmd.CommandText = sql;
                 cmd.Parameters.Clear();
                 cmd.Parameters.AddWithValue("like", "%" + phoneFormat + "%");
@@ -158,12 +158,13 @@ public class MarketSyncService
         {
             using var conn = new NpgsqlConnection(_iboxDbConnection);
             await conn.OpenAsync();
-            const string sql = @"
-                SELECT total 
-                FROM sales_detailed 
-                WHERE outlet_id = @outlet_id
-                  AND shipment_date::date >= CURRENT_DATE - INTERVAL '30 days'";
 
+            // If sales_detailed has a currency_code column or FK, include it
+            const string sql = @"
+            SELECT total, currency_code 
+            FROM sales_detailed 
+            WHERE outlet_id = @outlet_id
+              AND shipment_date::date >= CURRENT_DATE - INTERVAL '30 days'";
 
             using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("outlet_id", clientId);
@@ -177,7 +178,14 @@ public class MarketSyncService
             {
                 recordCount++;
 
-                var raw = reader.IsDBNull(0) ? null : reader.GetString(0)?.Replace(",", ".").Trim();
+                // Get raw total
+                var raw = reader.IsDBNull(0)
+                    ? null
+                    : reader.GetString(0)?.Replace(",", ".").Trim();
+
+                // Get currency code (can be null)
+                var currencyCode = reader.IsDBNull(1) ? null : reader.GetString(1)?.Trim().ToUpper();
+
                 if (string.IsNullOrWhiteSpace(raw))
                 {
                     Console.WriteLine($"   ⚠️ Skipping empty total value at record #{recordCount}");
@@ -186,17 +194,21 @@ public class MarketSyncService
 
                 if (decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var amount))
                 {
-                    // Smarter detection:
-                    // Consider UZS if raw contains thousands separator OR value is very high
-                    bool isLikelyUzs = raw.Contains(",") || amount >= 1000;
+                    decimal usdAmount;
 
-                    decimal usdAmount = isLikelyUzs
-                        ? Math.Round(amount / _exchangeRate, 2)
-                        : amount;
+                    // If currency is UZS, convert to USD; otherwise treat as USD
+                    if (currencyCode == "UZS")
+                    {
+                        usdAmount = Math.Round(amount / _exchangeRate, 2);
+                    }
+                    else
+                    {
+                        usdAmount = amount; // already USD
+                    }
 
                     totalUsd += usdAmount;
 
-                    Console.WriteLine($"   ✅ Record #{recordCount}: Raw = \"{raw}\" => {(isLikelyUzs ? "UZS" : "USD")} => ${usdAmount}");
+                    Console.WriteLine($"   ✅ Record #{recordCount}: Raw = \"{raw}\" ({currencyCode ?? "USD"}) => ${usdAmount}");
                 }
                 else
                 {

@@ -9,13 +9,15 @@ using Evim_agent_bot.YandexMapLibrary.Services;
 public class TelegramBotHandler
 {
     private readonly TelegramBotClient _botClient;
+    private readonly string _botToken; // Store your token here
     private readonly DbStorageService _dbStorage;
 
-    // Step: 1 = Name, 2 = Number, 3 = Notes, 4 = Status
+    // Step: 1 = Name, 2 = Number, 3 = Notes, 4 = Status, 5 = Photo
     private readonly Dictionary<long, (MarketLocation Location, int Step)> _pendingLocations = new();
 
     public TelegramBotHandler(string token, string connectionString)
     {
+        _botToken = token;
         _botClient = new TelegramBotClient(token);
         _dbStorage = new DbStorageService(connectionString);
     }
@@ -51,6 +53,7 @@ public class TelegramBotHandler
             var chatId = msg.Chat.Id;
             var userId = msg.From?.Id ?? 0;
 
+            // Handle new location start
             if (msg.Location != null)
             {
                 var location = new MarketLocation
@@ -67,10 +70,11 @@ public class TelegramBotHandler
                 return;
             }
 
-            if (_pendingLocations.TryGetValue(userId, out var session) && !string.IsNullOrWhiteSpace(msg.Text))
+            // Handle step-based input
+            if (_pendingLocations.TryGetValue(userId, out var session) && (!string.IsNullOrWhiteSpace(msg.Text) || msg.Photo != null))
             {
                 var (location, step) = session;
-                string text = msg.Text.Trim();
+                string text = msg.Text?.Trim() ?? "";
 
                 switch (step)
                 {
@@ -102,11 +106,50 @@ public class TelegramBotHandler
 
                         await bot.SendTextMessageAsync(chatId, "📌 Выберите *статус* партнёра:", replyMarkup: buttons, parseMode: ParseMode.Markdown);
                         break;
+
+                    case 5: // Photo step
+                        if (msg.Photo != null && msg.Photo.Any())
+                        {
+                            var fileId = msg.Photo.Last().FileId;
+                            var file = await bot.GetFileAsync(fileId);
+                            var fileUrl = $"https://api.telegram.org/file/bot{_botToken}/{file.FilePath}";
+                            location.PhotoUrl = fileUrl;
+                        }
+                        else if (!string.IsNullOrWhiteSpace(text) && text.ToLower() == "нет")
+                        {
+                            location.PhotoUrl = null;
+                        }
+                        else
+                        {
+                            await bot.SendTextMessageAsync(chatId, "❌ Пожалуйста, отправьте фото или напишите 'нет'.");
+                            return;
+                        }
+
+                        // Save to DB
+                        _pendingLocations.Remove(userId);
+
+                        try
+                        {
+                            await _dbStorage.SaveLocationAsync(location);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine("❌ DB Save Error: " + ex.Message);
+                            await bot.SendTextMessageAsync(chatId, "❌ Ошибка при сохранении данных.");
+                            return;
+                        }
+
+                        await bot.SendTextMessageAsync(chatId,
+                            $"✅ Сохранено:\n🏪 {location.MarketName} #{location.MarketNumber}\n📍 ({location.Latitude}, {location.Longitude})\n🟢 Статус: {location.Status}");
+
+                        await bot.SendTextMessageAsync(chatId, "🗺️ Посмотреть на карте: https://evimagents.onrender.com");
+                        break;
                 }
 
                 return;
             }
 
+            // Default start
             if (msg.Text == "/start")
             {
                 await bot.SendTextMessageAsync(chatId, "👋 Добро пожаловать!\nПожалуйста, отправьте свою *локацию*, чтобы начать метку магазина.", parseMode: ParseMode.Markdown);
@@ -133,26 +176,10 @@ public class TelegramBotHandler
                 var statusNum = int.Parse(query.Data.Replace("status_", ""));
                 session.Location.Status = (PartnerStatus)statusNum;
 
-                _pendingLocations.Remove(userId);
+                // Move to photo step instead of saving immediately
+                _pendingLocations[userId] = (session.Location, 5);
 
-                Console.WriteLine("Saving location: " + System.Text.Json.JsonSerializer.Serialize(session.Location));
-
-                try
-                {
-                    await _dbStorage.SaveLocationAsync(session.Location);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("❌ DB Save Error: " + ex.Message);
-                    Console.WriteLine(ex.StackTrace);
-                    await bot.SendTextMessageAsync(chatId, "❌ Ошибка: проблема при сохранении данных.");
-                    return;
-                }
-
-                await bot.SendTextMessageAsync(chatId,
-                    $"✅ Сохранено:\n🏪 {session.Location.MarketName} #{session.Location.MarketNumber}\n📍 ({session.Location.Latitude}, {session.Location.Longitude})\n🟢 Статус: {(PartnerStatus)statusNum}");
-
-                await bot.SendTextMessageAsync(chatId, "🗺️ Посмотреть на карте: https://evimagents.onrender.com");
+                await bot.SendTextMessageAsync(chatId, "📷 Отправьте фото магазина (или напишите 'нет').");
                 await bot.AnswerCallbackQueryAsync(query.Id);
             }
         }
