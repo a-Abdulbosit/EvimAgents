@@ -14,8 +14,7 @@ namespace Evim_agent_bot.YandexMapLibrary.Services
 
         public DbStorageService()
         {
-            _connectionString = Environment.GetEnvironmentVariable("Host=95.182.117.158;Port=5432;Database=evimclients_db;Username=postgres;Password=9554")
-                ?? "Host=95.182.117.158;Port=5432;Database=evimclients_db;Username=postgres;Password=9554";
+            _connectionString = Environment.GetEnvironmentVariable("EVIM_CLIENTS_DB");
         }
 
         public async Task MarkAsVisitedAsync(long id)
