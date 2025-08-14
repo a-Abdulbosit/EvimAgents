@@ -163,7 +163,7 @@ app.MapGet("/sync/{phone}", async (string phone) =>
 });
 
 // ✅ Start Telegram bot
-var botToken = Environment.GetEnvironmentVariable("7232218961:AAF5rGUQQaYVQRfRHN93-7K5AmKR6WBRhO0")
+var botToken = Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN")
                ?? "7232218961:AAF5rGUQQaYVQRfRHN93-7K5AmKR6WBRhO0";
 
 var botHandler = new TelegramBotHandler(botToken, connectionString);
