@@ -9,10 +9,9 @@ using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var connectionString = Environment.GetEnvironmentVariable("Host=95.182.117.158;Port=5432;Database=evimclients_db;Username=postgres;Password=9554")
-    ?? "Host=95.182.117.158;Port=5432;Database=evimclients_db;Username=postgres;Password=9554";
+var connectionString = Environment.GetEnvironmentVariable("EVIM_CLIENTS_DB");
 
-var iboxConnectionString = "Host=95.182.117.158;Port=5432;Database=evim_db;Username=postgres;Password=9554";
+var iboxConnectionString = "EVIM_DB";
 
 var app = builder.Build();
 
@@ -163,8 +162,7 @@ app.MapGet("/sync/{phone}", async (string phone) =>
 });
 
 // ✅ Start Telegram bot
-var botToken = Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN")
-               ?? "7232218961:AAF5rGUQQaYVQRfRHN93-7K5AmKR6WBRhO0";
+var botToken = Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN") ;
 
 var botHandler = new TelegramBotHandler(botToken, connectionString);
 botHandler.Start();
