@@ -11,6 +11,8 @@ namespace Evim_agent_bot.YandexMapLibrary.Models
 
     public class MarketLocation
     {
+        public long Id { get; set; }
+        public string? PhotoUrl { get; set; }
         public long TelegramUserId { get; set; }
         public string AgentName { get; set; } = string.Empty;
         public string MarketNumber { get; set; } = string.Empty;
