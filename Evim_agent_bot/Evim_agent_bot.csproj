@@ -21,5 +21,8 @@
 			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
 		</Content>
 	</ItemGroup>
+	<ItemGroup>
+	  <Folder Include="wwwroot\uploads\" />
+	</ItemGroup>
 
 </Project>

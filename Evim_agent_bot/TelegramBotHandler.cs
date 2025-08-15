@@ -111,17 +111,29 @@ public class TelegramBotHandler
                         if (msg.Photo != null && msg.Photo.Any())
                         {
                             var fileId = msg.Photo.Last().FileId;
+
                             var file = await bot.GetFileAsync(fileId);
+
                             var fileUrl = $"https://api.telegram.org/file/bot{_botToken}/{file.FilePath}";
-                            location.PhotoUrl = fileUrl;
+
+                            using var httpClient = new HttpClient();
+                            var fileBytes = await httpClient.GetByteArrayAsync(fileUrl);
+
+                            // Step 4: Save it locally (use unique filename to avoid overwrite)
+                            var savePath = Path.Combine("wwwroot/uploads", $"{Guid.NewGuid()}.jpg");
+                            await System.IO.File.WriteAllBytesAsync(savePath, fileBytes);
+
+                            // Step 5: Store the local path or public URL instead of Telegram's temp link
+                            location.PhotoUrl = $"/uploads/{Path.GetFileName(savePath)}";
                         }
-                        else if (!string.IsNullOrWhiteSpace(text) && text.ToLower() == "нет")
+
+                        else if (!string.IsNullOrWhiteSpace(text) && text.ToLower() == ".")
                         {
                             location.PhotoUrl = null;
                         }
                         else
                         {
-                            await bot.SendTextMessageAsync(chatId, "❌ Пожалуйста, отправьте фото или напишите 'нет'.");
+                            await bot.SendTextMessageAsync(chatId, "❌ Пожалуйста, отправьте фото или напишите 'yoq'.");
                             return;
                         }
 
