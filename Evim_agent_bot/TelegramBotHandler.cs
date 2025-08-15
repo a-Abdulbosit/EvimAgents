@@ -119,6 +119,11 @@ public class TelegramBotHandler
                             using var httpClient = new HttpClient();
                             var fileBytes = await httpClient.GetByteArrayAsync(fileUrl);
 
+                            var uploadsPath = Path.Combine("wwwroot", "uploads");
+                            if (!Directory.Exists(uploadsPath))
+                            {
+                                Directory.CreateDirectory(uploadsPath);
+                            }
                             // Step 4: Save it locally (use unique filename to avoid overwrite)
                             var savePath = Path.Combine("wwwroot/uploads", $"{Guid.NewGuid()}.jpg");
                             await System.IO.File.WriteAllBytesAsync(savePath, fileBytes);
