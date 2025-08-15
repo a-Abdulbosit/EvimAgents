@@ -119,17 +119,20 @@ public class TelegramBotHandler
                             using var httpClient = new HttpClient();
                             var fileBytes = await httpClient.GetByteArrayAsync(fileUrl);
 
-                            var uploadsPath = Path.Combine("wwwroot", "uploads");
+                            var uploadsPath = "/uploads"; // Render's writable folder
+
                             if (!Directory.Exists(uploadsPath))
                             {
                                 Directory.CreateDirectory(uploadsPath);
                             }
-                            // Step 4: Save it locally (use unique filename to avoid overwrite)
-                            var savePath = Path.Combine("wwwroot/uploads", $"{Guid.NewGuid()}.jpg");
+
+                            var fileName = $"{Guid.NewGuid()}.jpg";
+                            var savePath = Path.Combine(uploadsPath, fileName);
                             await System.IO.File.WriteAllBytesAsync(savePath, fileBytes);
 
-                            // Step 5: Store the local path or public URL instead of Telegram's temp link
-                            location.PhotoUrl = $"/uploads/{Path.GetFileName(savePath)}";
+                            // If you still want to serve it publicly, copy it into wwwroot or use a route to serve files
+                            location.PhotoUrl = $"/uploads/{fileName}";
+
                         }
 
                         else if (!string.IsNullOrWhiteSpace(text) && text.ToLower() == ".")
